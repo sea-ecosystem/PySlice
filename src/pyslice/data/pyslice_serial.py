@@ -9,12 +9,14 @@ import numpy as np
 from pathlib import Path
 from h5py import File, Group, Dataset
 from ..backend import to_numpy
+from warnings import warn
 
 try:
     import sys
     sys.path.insert(1,"../../")
-    from pySEA.sea_eco.architecture.base_structure_numpy import Signal, Dimensions, Dimension, Metadata, safe_decode
+    from pySEA.sea_eco.architecture.base_structure import Signal, Dimensions, Dimension, Metadata, safe_decode
 except Exception:
+    warn("pySEA is not installed. .to_sea() and related functionality will not work.")
     class Signal:
         def to_sea(self,*args,**kwargs):
             raise ImportError("pySEA is required for .to_sea() serialization")

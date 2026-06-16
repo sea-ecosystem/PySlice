@@ -66,18 +66,13 @@ class WFData(PySliceSerial, Signal):
         # Build Signal dimensions
         if Dimensions is not None:
             layer_arr = to_numpy(layer) if layer is not None else np.array([0])
-            self.dimensions = Dimensions([
-                Dimension(name='probe',  space='position',
-                          values=np.arange(len(probe_positions))),
-                Dimension(name='time',   space='temporal',   units='ps',
-                          values=to_numpy(time)),
-                Dimension(name='kx',     space='scattering', units='Å⁻¹',
-                          values=to_numpy(kxs)),
-                Dimension(name='ky',     space='scattering', units='Å⁻¹',
-                          values=to_numpy(kys)),
-                Dimension(name='layer',  space='position',
-                          values=layer_arr),
-            ], nav_dimensions=[0, 1], sig_dimensions=[2, 3, 4])
+            dimensions = Dimensions([
+                Dimension(name='probe', space='position', values=np.arange(len(probe_positions))),
+                Dimension(name='time', space='temporal', units='ps', values=to_numpy(time)),
+                Dimension(name='kx', space='scattering', units='Å⁻¹', values=to_numpy(kxs)),
+                Dimension(name='ky', space='scattering', units='Å⁻¹', values=to_numpy(kys)),
+                Dimension(name='layer', space='position', values=layer_arr),
+            ], nav_dimensions=[0, 1], det_dimensions=[2, 3, 4])
 
             pp_array = np.array(probe_positions).flatten().tolist()
             self.metadata = Metadata({
@@ -91,25 +86,18 @@ class WFData(PySliceSerial, Signal):
                     'aperture_mrad': float(probe.mrad),
                     'probe_positions': pp_array,
                     'n_probes': len(probe_positions),
-                },
+                }
+            })
+            metadata = Metadata({
+                'aperture_mrad': float(probe.mrad),
+                'probe_positions': pp_array,
+                'n_probes': len(probe_positions),
             })
 
-    # ------------------------------------------------------------------
-    # Properties — public interface always returns numpy
-    # ------------------------------------------------------------------
-
-    @property
-    def kxs(self)   -> np.ndarray: return to_numpy(self._kxs)
-    @property
-    def kys(self)   -> np.ndarray: return to_numpy(self._kys)
-    @property
-    def xs(self)    -> np.ndarray: return to_numpy(self._xs)
-    @property
-    def ys(self)    -> np.ndarray: return to_numpy(self._ys)
-    @property
-    def time(self)  -> np.ndarray: return to_numpy(self._time) if self._time is not None else None
-    @property
-    def layer(self) -> np.ndarray: return to_numpy(self._layer) if self._layer is not None else None
+        # Store array AFTER super().__init__ to avoid being overwritten
+        self._array = array
+        super().__init__(data=array, dimensions=dimensions, metadata=metadata)
+        self.metadata = metadata
 
     @property
     def data(self):

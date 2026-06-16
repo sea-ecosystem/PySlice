@@ -11,7 +11,7 @@ from tqdm import tqdm
 from typing import Optional, Dict, Union
 
 from ..multislice.trajectory import Trajectory
-from ..multislice.potentials import get_z_from_element
+from ..multislice.potentials import get_z_from_element, getZfromElementName
 
 logger = logging.getLogger(__name__)
 
