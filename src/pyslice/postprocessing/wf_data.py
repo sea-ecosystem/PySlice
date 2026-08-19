@@ -66,6 +66,8 @@ class WFData(PySliceSerial, Signal):
         # Build Signal dimensions
         if Dimensions is not None:
             layer_arr = to_numpy(layer) if layer is not None else np.array([0])
+            if layer_arr.size == 0:  # return_layers=None: wavefunction output suppressed
+                layer_arr = np.array([0])
             time_arr = to_numpy(time) if time is not None else np.array([0])
             self.dimensions = Dimensions([
                 Dimension(name='probe',  space='position',
