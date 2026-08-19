@@ -77,7 +77,7 @@ class WFData(PySliceSerial, Signal):
                           values=to_numpy(kys)),
                 Dimension(name='layer',  space='position',
                           values=layer_arr),
-            ], nav_dimensions=[0, 1], sig_dimensions=[2, 3, 4])
+            ], nav_dimensions=[0, 1], det_dimensions=[2, 3, 4])
 
             pp_array = np.array(probe_positions).flatten().tolist()
             self.metadata = Metadata({

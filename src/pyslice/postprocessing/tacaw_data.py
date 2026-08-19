@@ -98,7 +98,7 @@ class TACAWData(PySliceSerial, Signal):
                           values=to_numpy(self._kxs)),
                 Dimension(name='ky',        space='scattering', units='Å⁻¹',
                           values=to_numpy(self._kys)),
-            ], nav_dimensions=[0, 1], sig_dimensions=[2, 3])
+            ], nav_dimensions=[0, 1], det_dimensions=[2, 3])
 
             self.metadata = Metadata({
                 'General':    {'title': 'TACAW Intensity', 'signal_type': 'TACAW'},

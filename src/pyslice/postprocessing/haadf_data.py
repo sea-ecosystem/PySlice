@@ -63,7 +63,7 @@ class HAADFData(PySliceSerial, Signal):
             self.dimensions = Dimensions([
                 Dimension(name='x', space='position', units='Å', values=np.array([0])),
                 Dimension(name='y', space='position', units='Å', values=np.array([0])),
-            ], nav_dimensions=[0, 1], sig_dimensions=[])
+            ], nav_dimensions=[0, 1], det_dimensions=[])
 
             # Build metadata
             metadata_dict = {
@@ -168,7 +168,7 @@ class HAADFData(PySliceSerial, Signal):
             self._local_dimensions = Dimensions([
                 Dimension(name='x', space='position', units='Å', values=xs_np),
                 Dimension(name='y', space='position', units='Å', values=ys_np),
-            ], nav_dimensions=[0, 1], sig_dimensions=[])
+            ], nav_dimensions=[0, 1], det_dimensions=[])
 
             # Update metadata with detector settings
             #if hasattr(self.signal.metadata, 'Simulation'):

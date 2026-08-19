@@ -11,14 +11,12 @@ from h5py import File, Group, Dataset
 from ..backend import to_numpy
 
 try:
-    import sys
-    sys.path.insert(1,"../../")
-    from pySEA.sea_eco.architecture.base_structure_numpy import Signal, Dimensions, Dimension, Metadata, safe_decode
+    from pySEA.sea_eco.architecture.base_structure import Signal, Dimensions, Dimension, Metadata, safe_decode
 except Exception:
     class Signal:
         def to_sea(self,*args,**kwargs):
-            raise ImportError("pySEA is required for .to_sea() serialization")
-    Dimensions,Dimension,Metadata = None,None,None
+            raise ImportError("pySEA (sea-eco) is required for .to_sea() serialization")
+    Dimensions,Dimension,Metadata,safe_decode = None,None,None,None
 
 def _to_numpy(x):
     """Convert tensor or array-like to numpy array."""
@@ -195,8 +193,8 @@ class PySliceSerial:
                     dims = Dimensions()
                     dims.from_hdf5_group(item)
                     self._local_dimensions = dims
-                elif sea_type == 'GeneralMetadata':
-                    meta = GeneralMetadata()
+                elif sea_type in ('Metadata', 'GeneralMetadata'):
+                    meta = Metadata()
                     meta.from_hdf5_group(item)
                     if key == 'metadata' or key == 'Metadata':
                         self.metadata = meta
