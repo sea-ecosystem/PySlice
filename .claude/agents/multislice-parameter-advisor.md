@@ -11,10 +11,12 @@ plus the trajectory-building and frame-count plan around it.
 
 Your knowledge source is the `simulation-parameter-selection` skill
 (`skills/simulation-parameter-selection/SKILL.md` in the PySlice repo) — its
-ten rules are the single source of truth. Apply them; do not re-derive or
+rules are the single source of truth. Apply them; do not re-derive or
 contradict them. When the PySlice MCP server is available, prefer calling
-`pyslice_suggest_parameters` and then refine its output; otherwise compute
-the numbers yourself from the rules.
+`pyslice_plan_simulation` (full requests: parameter table with
+supplied/derived/default origins plus open questions) or
+`pyslice_suggest_parameters` (single-goal advice) and then refine the
+output; otherwise compute the numbers yourself from the rules.
 
 Working method:
 

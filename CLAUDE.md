@@ -45,6 +45,9 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
   OVITO), in-memory ASE `Atoms`; caches `.npy` siblings next to sources.
 - `src/pyslice/io/databases.py` — Materials Project + COD search →
   CIF retrieval (stdlib urllib only; MP key via `PYSLICE_MP_API_KEY`).
+- `src/pyslice/io/build.py` — ASE-backed `build_slab` (exactly periodic
+  zone-axis slabs, orthogonalized cells, vacuum), `first_bragg_g`,
+  `atom_symbols`/`trajectory_to_ase` (canonical str/int normalization).
 - `src/pyslice/multislice/trajectory.py` — `Trajectory` (positions,
   velocities, atom_types, box_matrix, timestep in **ps**) + transforms
   (tile, rotate_to, tilt, slice, frozen-phonon displacements).
@@ -71,6 +74,9 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
 - **MCP:** `python -m pyslice.mcp [--workspace DIR]` — `pyslice_*` tools;
   call `pyslice_get_conventions` first. Thin server over
   `pyslice.mcp.service.PySliceService` (mirrors `pySEA.sea_eco.mcp`).
+  Prompted simulations go through `pyslice_plan_simulation` (parameter
+  table with supplied/derived/default origins + open questions → confirm →
+  execute → `pyslice_render_signal` visual → `pyslice_export_sea_file`).
 - **Skills:** `skills/pyslice` (umbrella), `multislice-imaging`,
   `tacaw-phonons`, `md-setup`, `simulation-parameter-selection` (the
   parameter physics — single source of truth), `structure-retrieval`
@@ -96,6 +102,14 @@ subagents are the workers. The parameter physics lives ONCE, in
   with `atom_mapping` at load time; `Potential._resolve_z` handles both.
 - **Structure edits are Trajectory transforms** (tile/rotate/tilt/crop/
   frozen-phonon), never `setup()` arguments; transforms return new objects.
+- **Oriented slabs come from `build_slab`** (exactly periodic; ASE surface
+  + orthogonalization); rotate-and-carve leaves non-periodic edges and is
+  the fallback only. The multislice grid reads only the box **diagonal**.
+- **SEAFile packaging contract:** results as plain calibrated `Signal`s in
+  `Simulations` (readable without PySlice); Material (unit cell,
+  `Metadata.Database`) and Sample (built structure, `Metadata.build`) in
+  `Materials`, Sample's SEAID rooted at the Material's. Link provenance on
+  the collection's own datasets — adding deep-copies and re-mints SEAIDs.
 - **Every frame is propagated** — frame count = frozen-phonon configs or MD
   snapshots.
 - **Blocking compute:** `MultisliceCalculator.run()` and MD `run()` block
@@ -120,8 +134,12 @@ python -m pytest tests/ -q
 Tests are numbered `NN_topic.py`. GPU-, OVITO-, and network-dependent tests
 gate themselves; `tests/27_mcp_service.py` and `tests/28_databases.py` run
 CPU-only with mocked HTTP (set `PYSLICE_DB_LIVE_TESTS=1` for the live COD
-round-trip). `tests/16_sea_eco_integration.py` exercises the `.sea` bridge
-and needs sea-eco installed.
+round-trip). `tests/30_plan_simulation.py` encodes the reference prompted-
+simulation requests (40 nm [110] diamond 4D-STEM with 10 nm slices;
+graphene dispersion to ±2g) as planning tests — extend it when adding
+intake rules. `tests/16_sea_eco_integration.py` is stale (imports names
+`pyslice.data` no longer exports); the live bridge coverage is in
+`tests/27_mcp_service.py` and `tests/31_sea_file_export.py`.
 
 ## Style rules
 

@@ -87,6 +87,9 @@ env vars and signup URL; network failures name the unreachable host.
 
 `pyslice_search_structures` (provider, formula/elements) →
 `pyslice_fetch_structure` (downloads into the workspace and, by default,
-returns a loaded Trajectory handle) → `pyslice_transform_trajectory` →
-simulation. Verify with `pyslice_describe_handle` and
-`pyslice_preview_potential` before running.
+returns a loaded Trajectory handle) → `pyslice_build_slab` (oriented,
+exactly periodic samples) or `pyslice_transform_trajectory` → simulation.
+Verify with `pyslice_describe_handle` and `pyslice_preview_potential`
+before running. The fetch records the database origin, and
+`pyslice_export_sea_file` later stores it under the Material entry's
+`Metadata.Database` in `SEAFile.Materials`.

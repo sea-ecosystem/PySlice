@@ -70,6 +70,25 @@ All lengths in Å, angles in mrad (θ below in radians), voltage in eV.
 10. **Detector angles (HAADF).** Inner ≥ ~3× aperture to stay dark-field
     (60–90 mrad typical); outer bounded by θ_max from rule 2.
 
+11. **Probe step from the first Bragg peak (atomic-resolution imaging).**
+    "Enough pixels per atom": step = d₁/(2·oversample) where d₁ = 1/g₁ is
+    the widest in-plane lattice spacing (`pyslice.io.build.first_bragg_g`,
+    in-plane, extinctions ignored — conservative) and oversample ≈ 10, i.e.
+    10× the Nyquist rate of the first Bragg frequency. This refines rule 6
+    when atoms must be clearly resolved.
+
+12. **k-range as multiples of g.** "Out to ±n·g" → `max_kx = max_ky =
+    n·g₁`; then sampling from rule 2 in k-form: sampling = 1/(3·k_max).
+    Compute g₁ from the *unit cell* — tiling shrinks it artificially.
+
+13. **Output slices every t Å of depth.** With slice thickness dz,
+    `return_layers = [every·i − 1 for i = 1…]` where every = round(t/dz),
+    always including the exit plane.
+
+14. **Scan extent default.** The lattice repeats: a map of ~2 projected
+    unit cells (2·d₁) per axis shows the atoms; larger maps cost probes ∝
+    extent².
+
 ## Natural Language Task Routing
 
 - "what sampling / pixel size do I need" → rule 2 (state λ and θ_max used).
@@ -108,3 +127,11 @@ floor you care about.
 suggested `setup` kwargs, tiling/frame advice, memory estimate, and
 per-value justifications. Feed its output into `pyslice_transform_trajectory`
 (tiling, frozen_phonon) and `pyslice_setup_multislice`.
+
+`pyslice_plan_simulation` is the full-request form: a structured request
+(technique + whatever the user supplied) returns a complete plan applying
+every rule above — a parameter table where each value is marked
+`supplied`/`derived`/`default` with its justification, build/thermal/setup/
+post-processing plans, a high-symmetry k-path where relevant, and **open
+questions** for the guessed values. Present that table for confirmation
+before executing (see the `pyslice` umbrella skill's intake workflow).

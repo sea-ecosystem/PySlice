@@ -53,6 +53,33 @@ Sub-skills (prefer the specific one when the task matches):
   calibrated Dimensions and Metadata; do not export raw arrays when a `.sea`
   is possible. Requires sea-eco installed (`pip install 'pyslice[sea]'`).
 
+## Prompted-Simulation Intake Workflow
+
+When a user *prompts for a simulation* ("I want an atomic-resolution 4D-STEM
+of 40 nm thick 110 diamond with slices every 10 nm", "vibrational EELS
+dispersion of graphene out to ±2g"), follow this sequence:
+
+1. **Decode** the prompt into a structured request: technique, material,
+   zone axis, thickness, k-range, slice interval, optics — convert units to
+   Å/mrad/eV. Get the unit cell first (`structure-retrieval`).
+2. **Plan**: call `pyslice_plan_simulation` with only what was actually
+   supplied. It returns a parameter table (each value marked
+   supplied/derived/default with justification) and **open questions** for
+   the guessed values.
+3. **Confirm**: present two summary tables — the parameter table and the
+   open questions ("not supplied, assumed X because Y") — and ask for
+   confirmation before running anything expensive.
+4. **Execute**: `pyslice_build_slab` (build plan) → thermal frames
+   (`pyslice_transform_trajectory` frozen_phonon or `pyslice_run_md`) →
+   `pyslice_setup_multislice` (check grid/memory) → `pyslice_run_multislice`
+   → technique post-processing.
+5. **Visualize**: `pyslice_render_signal` (sea-eco plotting, calibrated
+   axes) — a realistic image/pattern/map the user can look at, not just
+   file paths.
+6. **Persist**: `pyslice_export_sea_file` — results in Simulations plus the
+   Material (unit cell, database origin) and Sample (built structure,
+   `Metadata.build`) in `SEAFile.Materials`, Sample rooted at Material.
+
 ## Natural Language Task Routing
 
 Infer PySlice APIs from domain language; prefer PySlice's own functions over
@@ -64,9 +91,15 @@ re-implementations:
   for X": `structure-retrieval` skill —
   `pyslice.search_structures` / `pyslice.fetch_cif` /
   `pyslice.load_structure_from_database`.
-- "make a supercell / orient to a zone axis / tilt the sample / crop":
-  `Trajectory.tile_positions`, `.rotate_to((h, k, l))`,
-  `.tilt_positions(alpha, beta)` (radians), `.slice_positions`.
+- "N nm thick sample oriented along [hkl]", "a (hkl) slab":
+  `pyslice.io.build.build_slab` / `pyslice_build_slab` — exactly periodic
+  ASE-built slab (orthogonalized cell, thickness in layers, lateral repeats,
+  vacuum). Prefer this over rotate-and-carve; the carved path
+  (`rotate_to` + `slice_positions`) leaves non-periodic edges and is the
+  fallback for orientations without a small orthogonal periodic cell.
+- "make a supercell / tilt the sample / crop":
+  `Trajectory.tile_positions`, `.tilt_positions(alpha, beta)` (radians),
+  `.slice_positions`.
 - "frozen phonon / thermal snapshots without MD":
   `Trajectory.generate_random_displacements(n, sigma, seed)`.
 - "run MD / thermalize / phonon trajectory": `md-setup` skill —
@@ -120,11 +153,15 @@ If the PySlice MCP server is available (`python -m pyslice.mcp`), call
 `pyslice_get_conventions` first, then drive the same workflow through:
 
 - `pyslice_search_structures` / `pyslice_fetch_structure` / `pyslice_load_structure`
-- `pyslice_transform_trajectory` (tile, rotate_to, tilt, frozen_phonon, ...)
-- `pyslice_suggest_parameters` (call before every new simulation)
+- `pyslice_build_slab` (periodic zone-axis slabs) /
+  `pyslice_transform_trajectory` (tile, rotate_to, tilt, frozen_phonon, ...)
+- `pyslice_plan_simulation` (full prompted requests — see the intake
+  workflow) / `pyslice_suggest_parameters` (single-goal advice)
 - `pyslice_setup_multislice` → check grid/memory → `pyslice_run_multislice`
 - `pyslice_compute_haadf`, `pyslice_compute_tacaw`, `pyslice_tacaw_spectrum`,
   `pyslice_spectrum_image`, `pyslice_dispersion`, `pyslice_preview_potential`
-- `pyslice_export_sea`
+- `pyslice_render_signal` (sea-eco-rendered visuals)
+- `pyslice_export_sea` (single object) / `pyslice_export_sea_file`
+  (results + Material/Sample provenance in one SEAFile)
 
 Use direct Python when editing source files, notebooks, tests, or examples.

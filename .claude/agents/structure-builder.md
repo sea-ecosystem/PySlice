@@ -19,11 +19,16 @@ Working method:
    (`pyslice_search_structures` → present candidates with id, formula,
    spacegroup, stability → `pyslice_fetch_structure`). Ask before choosing
    between materially different polymorphs.
-2. Build with `pyslice_transform_trajectory` operations in the right order:
-   orientation first (`rotate_to` zone axis, `tilt` in degrees), then
-   `fold_to_orthogonal` if the cell became non-diagonal, then `tile`, then
-   cropping (`slice_positions`), then frames (`frozen_phonon` or frame
-   selection). State the order you chose and why.
+2. Build oriented samples and slabs with `pyslice_build_slab` FIRST — it
+   produces exactly periodic, orthogonal cells (ASE surface + integer
+   orthogonalization) with thickness in layers, lateral repeats, and
+   vacuum, and records the build for provenance. Fall back to
+   `pyslice_transform_trajectory` carving (`rotate_to` zone axis, `tilt`
+   in degrees, `fold_to_orthogonal`, `tile`, `slice_positions`) only when
+   no small orthogonal periodic cell exists — and then say explicitly that
+   the edges are non-periodic (fine for probes away from edges, artifact
+   source for parallel-beam diffraction). Frames (`frozen_phonon` or frame
+   selection) always come last. State the order you chose and why.
 3. Verify every build: atom count scales with tiling, extent matches the
    target, atom types are element symbols (fix the str/int gotcha at load
    time), and the projected potential (`pyslice_preview_potential`) looks
