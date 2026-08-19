@@ -51,6 +51,46 @@ class PySliceSerial:
 
     _sea_config = {}
 
+    # Fallback display name; Signal.__init__ (bypassed by PySlice data
+    # classes) would normally set an instance attribute. Subclasses set a
+    # specific instance name in their __init__.
+    name = "PySliceData"
+
+    @property
+    def signal_quantities(self):
+        """Lazily provide the ``SignalQuantities`` Signal.__init__ would set.
+
+        PySlice data classes bypass ``Signal.__init__``, but sea-eco methods
+        such as ``Signal.show`` dereference ``signal_quantities.axis``. This
+        returns (and caches) an empty ``SignalQuantities`` — scalar measured
+        quantities, ``axis`` is ``None`` — or ``None`` when sea-eco is absent.
+
+        Returns
+        -------
+        SignalQuantities | None
+            Cached empty quantity description, or ``None`` without sea-eco.
+        """
+        cached = getattr(self, '_signal_quantities', None)
+        if cached is None:
+            try:
+                from pySEA.sea_eco.architecture.base_structure import SignalQuantities
+            except Exception:
+                return None
+            cached = SignalQuantities()
+            self._signal_quantities = cached
+        return cached
+
+    @signal_quantities.setter
+    def signal_quantities(self, value):
+        """Store an explicit quantity description.
+
+        Parameters
+        ----------
+        value : SignalQuantities | None
+            Replacement quantity description (e.g. set on reload).
+        """
+        self._signal_quantities = value
+
     def to_hdf5_group(self, parent_group, force_datasets=None, name=None):
         """Serialize to HDF5 group with automatic type conversions."""
         config = getattr(self, '_sea_config', {})

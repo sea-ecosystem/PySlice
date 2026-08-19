@@ -48,6 +48,7 @@ class WFData(PySliceSerial, Signal):
         cache_dir: Optional[Path] = None,
     ):
         self._backend = backend
+        self.name = 'Wavefunction'
 
         self.probe_positions = probe_positions
         self.probe_xs = probe_xs

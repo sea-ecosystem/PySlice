@@ -18,7 +18,7 @@ import math
 import os
 from enum import Enum
 from pathlib import Path
-from typing import Any, Dict, List, Literal, Optional, Sequence
+from typing import Any, Dict, List, Literal, Optional, Sequence, Tuple
 from uuid import uuid4
 
 import numpy as np
@@ -613,6 +613,167 @@ class PreviewPotentialInput(StrictModel):
     response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
 
 
+class BuildSlabInput(StrictModel):
+    """Input for building an exactly periodic, beam-oriented slab.
+
+    Attributes
+    ----------
+    structure_handle : str
+        Bulk unit-cell trajectory handle to build from.
+    indices : list[int]
+        Miller indices of the plane stacked along the beam (for cubic
+        crystals this equals the [hkl] zone axis).
+    thickness_A : float | None
+        Target slab thickness in Å (rounded up to whole layers).
+    layers : int | None
+        Explicit layer count; overrides ``thickness_A``.
+    min_lateral_A : float | None
+        Minimum lateral extent in Å (whole-cell repeats).
+    repeats : list[int] | None
+        Explicit lateral repeats ``[nx, ny]``; overrides ``min_lateral_A``.
+    vacuum_A : float
+        Vacuum along the beam, split above and below.
+    max_index : int
+        Search bound for the orthogonalizing supercell.
+    name : str | None
+        Optional registry label for the result.
+    response_format : ResponseFormat
+        Output format for the response.
+    """
+
+    structure_handle: str = Field(..., description="Bulk unit-cell trajectory handle.")
+    indices: List[int] = Field(default=[0, 0, 1], min_length=3, max_length=3, description="Miller indices of the plane stacked along the beam, e.g. [1, 1, 0].")
+    thickness_A: Optional[float] = Field(default=None, gt=0, description="Target thickness in Å (rounded up to whole layers).")
+    layers: Optional[int] = Field(default=None, ge=1, description="Explicit layer count; overrides thickness_A.")
+    min_lateral_A: Optional[float] = Field(default=None, gt=0, description="Minimum lateral extent in Å.")
+    repeats: Optional[List[int]] = Field(default=None, min_length=2, max_length=2, description="Explicit lateral repeats [nx, ny].")
+    vacuum_A: float = Field(default=0.0, ge=0, description="Vacuum along the beam in Å (split above/below).")
+    max_index: int = Field(default=6, ge=1, le=12, description="Integer search bound for orthogonalization.")
+    name: Optional[str] = Field(default=None, description="Optional registry label.")
+    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+
+
+class PlanSimulationInput(StrictModel):
+    """Structured simulation request for the prompt→simulation planner.
+
+    Fill only what the user actually supplied; every omitted field is
+    resolved by the planner with an explicit ``default``/``derived`` origin
+    and, where it materially affects the result, an open question for
+    confirmation.
+
+    Attributes
+    ----------
+    technique : str
+        What is being simulated (drives every rule).
+    structure_handle : str
+        UNIT-CELL trajectory handle (plan first, build after confirmation).
+    zone_axis : list[int] | None
+        Beam-orientation Miller indices for the slab build.
+    thickness_A : float | None
+        Sample thickness in Å.
+    lateral_A : float | None
+        Lateral cell extent in Å.
+    slice_output_interval_A : float | None
+        Keep wavefunction slices every this many Å of depth.
+    voltage_eV, aperture_mrad, detector_mrad, scan_step_A, scan_extent_A :
+        Optics, when supplied.
+    probe_oversample : int
+        Probe-step oversampling relative to the first Bragg Nyquist step.
+    k_range_g : float | None
+        Recorded k-range as ± multiples of the first Bragg g.
+    thermal : str | None
+        Thermal model; derived from the technique when omitted.
+    max_frequency_THz, frequency_resolution_THz : float | None
+        TACAW frequency window targets.
+    response_format : ResponseFormat
+        Output format for the response.
+    """
+
+    technique: Literal["4dstem", "haadf", "diffraction", "tem_imaging", "tacaw_dispersion", "tacaw_spectrum_image"] = Field(
+        ..., description="Simulation technique the user asked for."
+    )
+    structure_handle: str = Field(..., description="Unit-cell trajectory handle (build the slab after the plan is confirmed).")
+    zone_axis: Optional[List[int]] = Field(default=None, min_length=3, max_length=3, description="Beam-orientation Miller indices, e.g. [1, 1, 0].")
+    thickness_A: Optional[float] = Field(default=None, gt=0, description="Sample thickness in Å (40 nm = 400 Å).")
+    lateral_A: Optional[float] = Field(default=None, gt=0, description="Lateral extent in Å.")
+    slice_output_interval_A: Optional[float] = Field(default=None, gt=0, description="Keep wavefunction slices every this many Å of depth.")
+    voltage_eV: Optional[float] = Field(default=None, gt=0, description="Accelerating voltage in eV.")
+    aperture_mrad: Optional[float] = Field(default=None, ge=0, description="Convergence semi-angle in mrad.")
+    detector_mrad: Optional[List[float]] = Field(default=None, min_length=2, max_length=2, description="ADF detector [inner, outer] in mrad.")
+    scan_step_A: Optional[float] = Field(default=None, gt=0, description="Probe step in Å (overrides the oversampling rule).")
+    scan_extent_A: Optional[float] = Field(default=None, gt=0, description="Scan-region size in Å.")
+    probe_oversample: int = Field(default=10, ge=1, le=50, description="Probe-step oversampling vs the first-Bragg Nyquist step.")
+    k_range_g: Optional[float] = Field(default=None, gt=0, description="Recorded k-range as ± multiples of the first Bragg g (e.g. 2 for ±2g).")
+    thermal: Optional[Literal["static", "frozen_phonon", "md"]] = Field(default=None, description="Thermal model; derived from the technique when omitted.")
+    max_frequency_THz: Optional[float] = Field(default=None, gt=0, description="TACAW: highest phonon frequency to resolve.")
+    frequency_resolution_THz: Optional[float] = Field(default=None, gt=0, description="TACAW: frequency-bin width.")
+    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+
+
+class RenderSignalInput(StrictModel):
+    """Input for rendering a result handle with sea-eco plotting.
+
+    Attributes
+    ----------
+    handle : str
+        WFData/HAADFData/TACAWData or array handle.
+    filename : str
+        Workspace-relative output path (.png; .html for plotly).
+    backend : {"matplotlib", "plotly"}
+        sea-eco plotting backend.
+    dims : list[int] | str | None
+        Dimensions to plot (sea-eco ``show`` semantics: 'det', 'nav', or
+        indices).
+    kwargs : dict
+        Extra keyword arguments forwarded to ``Signal.show``.
+    response_format : ResponseFormat
+        Output format for the response.
+    """
+
+    handle: str = Field(..., description="Result handle to render.")
+    filename: str = Field(..., min_length=1, description="Workspace-relative output path (.png, or .html for plotly).")
+    backend: Literal["matplotlib", "plotly"] = Field(default="matplotlib", description="sea-eco plotting backend.")
+    dims: List[int] | str | None = Field(default=None, description="Dimensions to plot ('det', 'nav', or indices).")
+    kwargs: Dict[str, Any] = Field(default_factory=dict, description="Extra Signal.show keyword arguments (cmap, norm, ...).")
+    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+
+
+class ExportSeaFileInput(StrictModel):
+    """Input for packaging results and materials into one SEAFile.
+
+    Attributes
+    ----------
+    filename : str
+        Workspace-relative ``.sea`` output path.
+    signal_handles : list[str]
+        Result handles placed in ``SEAFile.Simulations``.
+    sample_handle : str | None
+        Built-structure trajectory handle stored as the Sample material
+        (with its build record under ``Metadata.build``).
+    material_handle : str | None
+        Unit-cell trajectory handle stored as the Material (with database
+        info under ``Metadata.Database``); the Sample's provenance roots to
+        it.
+    name : str | None
+        SEAFile name.
+    material_name : str | None
+        Display name for the Material entry (e.g. the formula).
+    metadata : dict | None
+        Extra file-level metadata.
+    response_format : ResponseFormat
+        Output format for the response.
+    """
+
+    filename: str = Field(..., min_length=1, description="Workspace-relative .sea output path.")
+    signal_handles: List[str] = Field(default_factory=list, description="Result handles for SEAFile.Simulations.")
+    sample_handle: Optional[str] = Field(default=None, description="Built-structure trajectory handle → Materials 'Sample' entry.")
+    material_handle: Optional[str] = Field(default=None, description="Unit-cell trajectory handle → Materials 'Material' entry.")
+    name: Optional[str] = Field(default=None, description="SEAFile name.")
+    material_name: Optional[str] = Field(default=None, description="Display name for the Material entry.")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Extra file-level metadata mapping.")
+    response_format: ResponseFormat = Field(default=ResponseFormat.MARKDOWN)
+
+
 class ExportSeaInput(StrictModel):
     """Input for exporting a result handle to a ``.sea`` file.
 
@@ -740,6 +901,8 @@ class PySliceService:
         self.workspace = Path(workspace).expanduser().resolve()
         self.workspace.mkdir(parents=True, exist_ok=True)
         self._objects: Dict[str, Any] = {}
+        self._source_info: Dict[str, Dict[str, Any]] = {}
+        self._build_records: Dict[str, Dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     # Conventions / registry
@@ -941,6 +1104,12 @@ class PySliceService:
         if load:
             trajectory = Loader(filename=str(cif_path), timestep=timestep_ps).load()
             payload.update(self._register(trajectory, preferred=cif_path.stem))
+            self._source_info[payload["handle"]] = {
+                "database": "Materials Project" if provider == "mp" else "Crystallography Open Database",
+                "provider": provider,
+                "entry_id": entry_id,
+                "cif_path": str(cif_path),
+            }
         return payload
 
     def load_structure(
@@ -1062,6 +1231,70 @@ class PySliceService:
             applied.append(op)
         result = self._register(trajectory, preferred=name or f"{handle.split(':', 1)[-1]}-built")
         result["applied_operations"] = applied
+        if handle in self._source_info:
+            self._source_info[result["handle"]] = dict(self._source_info[handle])
+        parent_record = self._build_records.get(handle, {})
+        # Operations are stored as JSON strings: lists of dicts do not
+        # survive Metadata HDF5 serialization, lists of strings do.
+        self._build_records[result["handle"]] = {
+            **parent_record,
+            "parent_handle": handle,
+            "operations": list(parent_record.get("operations", []))
+            + [json.dumps({"op": op.op, "params": dict(op.params)}) for op in operations],
+        }
+        return result
+
+    def build_slab(self, params: BuildSlabInput) -> Dict[str, Any]:
+        """Build an exactly periodic, beam-oriented slab from a unit cell.
+
+        Wraps :func:`pyslice.io.build.build_slab` (ASE ``surface`` + integer
+        orthogonalization): the requested plane is stacked along the beam,
+        the in-plane cell is squared onto the Cartesian axes, and lateral
+        repeats plus optional vacuum are applied — no carved, non-periodic
+        edges.
+
+        Parameters
+        ----------
+        params : BuildSlabInput
+            Validated slab specification.
+
+        Returns
+        -------
+        dict
+            New trajectory handle, summary, and the build record (also kept
+            for ``Metadata.build`` when exporting a SEAFile).
+
+        Raises
+        ------
+        KeyError
+            If the structure handle is unknown.
+        TypeError
+            If the handle is not a Trajectory.
+        ValueError
+            If no orthogonal periodic cell exists within the search bound;
+            the message names the carve fallback.
+        """
+        from ..io.build import build_slab as _build_slab
+        from ..multislice.trajectory import Trajectory
+
+        source = self._require_type(params.structure_handle, Trajectory)
+        trajectory, record = _build_slab(
+            source,
+            indices=tuple(params.indices),
+            thickness_A=params.thickness_A,
+            layers=params.layers,
+            min_lateral_A=params.min_lateral_A,
+            repeats=tuple(params.repeats) if params.repeats else None,
+            vacuum_A=params.vacuum_A,
+            max_index=params.max_index,
+        )
+        label = params.name or f"slab-{''.join(str(i) for i in params.indices)}"
+        result = self._register(trajectory, preferred=label)
+        record["parent_handle"] = params.structure_handle
+        self._build_records[result["handle"]] = record
+        if params.structure_handle in self._source_info:
+            self._source_info[result["handle"]] = dict(self._source_info[params.structure_handle])
+        result["build_record"] = record
         return result
 
     # ------------------------------------------------------------------
@@ -1247,6 +1480,342 @@ class PySliceService:
             "suggested": suggested,
             "justification": justification,
         }
+
+    def plan_simulation(self, params: PlanSimulationInput) -> Dict[str, Any]:
+        """Turn a structured simulation request into a confirmable full plan.
+
+        The prompt→simulation intake step: takes what the user actually
+        supplied, resolves everything else from the parameter-selection
+        rules, and returns (1) a parameter table where every value carries
+        its origin — ``supplied``, ``derived``, or ``default`` — and a
+        one-line justification, (2) a build plan, a thermal plan, and
+        ready-to-use ``setup`` kwargs, (3) a post-processing/visualization
+        plan, and (4) the open questions an agent should present for
+        confirmation before executing.
+
+        Parameters
+        ----------
+        params : PlanSimulationInput
+            The structured request (unit-cell handle + supplied fields).
+
+        Returns
+        -------
+        dict
+            ``technique``, ``structure`` summary, ``parameters`` table,
+            ``build_plan``, ``thermal_plan``, ``simulation_setup``,
+            ``postprocess_plan``, ``open_questions``, and
+            ``estimated_wavefunction_GiB``.
+
+        Raises
+        ------
+        KeyError
+            If the structure handle is unknown.
+        TypeError
+            If the handle is not a Trajectory.
+
+        See Also
+        --------
+        build_slab : Executes the build plan.
+        setup_multislice : Consumes ``simulation_setup``.
+
+        Notes
+        -----
+        Plan from the *unit cell*: the first-Bragg spacing that drives probe
+        steps and k-ranges is computed from the handle's box matrix, and
+        tiling shrinks it artificially.
+        """
+        from ..io.build import first_bragg_g
+        from ..multislice.trajectory import Trajectory
+
+        trajectory = self._require_type(params.structure_handle, Trajectory)
+        technique = params.technique
+        stem = technique in ("4dstem", "haadf", "tacaw_spectrum_image")
+        tacaw = technique in ("tacaw_dispersion", "tacaw_spectrum_image")
+
+        table: List[Dict[str, Any]] = []
+        open_questions: List[Dict[str, str]] = []
+
+        def add(name: str, value: Any, origin: str, justification: str, ask: Optional[str] = None) -> Any:
+            """Record one plan parameter (and optionally an open question)."""
+            table.append({"name": name, "value": value, "origin": origin, "justification": justification})
+            if ask and origin != "supplied":
+                open_questions.append({"parameter": name, "assumed": str(value), "why_it_matters": ask})
+            return value
+
+        g1 = first_bragg_g(trajectory.box_matrix)
+        d1 = 1.0 / g1
+        voltage = add(
+            "voltage_eV", params.voltage_eV or 100e3,
+            "supplied" if params.voltage_eV else "default",
+            "accelerating voltage", ask="changes wavelength, hence every sampling rule",
+        )
+        lam = _electron_wavelength_A(voltage)
+
+        if params.aperture_mrad is not None:
+            aperture = add("aperture_mrad", params.aperture_mrad, "supplied", "convergence semi-angle")
+        elif stem:
+            aperture = add("aperture_mrad", 30.0, "default",
+                           "atomic-size probe, typical aberration-corrected STEM",
+                           ask="probe size and CBED disk size follow from it")
+        else:
+            aperture = add("aperture_mrad", 0.0, "derived",
+                           "parallel beam — momentum-resolved/diffraction techniques need plane-wave illumination")
+
+        # Largest k that must be represented -> real-space sampling.
+        k_parts: List[float] = []
+        detector = None
+        if technique == "haadf":
+            detector = params.detector_mrad or [60.0, 200.0]
+            add("detector_mrad", detector, "supplied" if params.detector_mrad else "default",
+                "ADF collection annulus", ask="sets image contrast regime (LAADF/HAADF)")
+            k_parts.append(1.2 * detector[1] * 1e-3 / lam)
+        if params.k_range_g is not None:
+            k_parts.append(params.k_range_g * g1)
+            add("k_range", f"±{params.k_range_g} g = ±{params.k_range_g * g1:.3f} 1/Å", "supplied",
+                f"first Bragg g = {g1:.3f} 1/Å (d = {d1:.2f} Å)")
+        elif tacaw:
+            k_parts.append(1.5 * g1)
+            add("k_range", f"±1.5 g = ±{1.5 * g1:.3f} 1/Å", "default",
+                "covers the first Brillouin zones for dispersion",
+                ask="extend for higher-zone phonon branches")
+        if aperture > 0:
+            k_parts.append(3.0 * aperture * 1e-3 / lam)
+        if not k_parts:
+            k_parts.append(50e-3 / lam)
+        k_max = max(k_parts)
+        sampling = add("sampling_A", round(1.0 / (3.0 * k_max), 4), "derived",
+                       f"band limit keeps k ≤ 1/(3·sampling); representing {k_max:.3f} 1/Å needs ≤ {1.0 / (3.0 * k_max):.4f} Å/px")
+
+        thickness = params.thickness_A
+        if thickness:
+            add("thickness_A", thickness, "supplied", "sample thickness along the beam")
+        slice_thickness = add("slice_thickness_A", 0.5, "default",
+                              "standard multislice slice; the builder divides the cell height evenly")
+
+        # Lateral extent -> build plan.
+        lateral_reasons = []
+        lateral_needed = 0.0
+        if aperture > 0:
+            probe_d = 1.22 * lam / (aperture * 1e-3)
+            lateral_needed = max(lateral_needed, 4.0 * probe_d, 5.0 * lam / (aperture * 1e-3))
+            lateral_reasons.append(f"probe diameter {probe_d:.2f} Å needs ≥4× cell width (PBC wraparound) and ≥5 k-points across the aperture disk")
+        if technique == "tacaw_dispersion":
+            lateral_needed = max(lateral_needed, 100.0, 20.0 * d1)
+            lateral_reasons.append("dispersion k-resolution: Δk = 1/L ≤ g/20, and ≥10 nm as a working floor")
+        lateral_needed = max(lateral_needed, 20.0)
+        if params.lateral_A:
+            lateral = add("lateral_A", params.lateral_A, "supplied", "lateral cell extent")
+            if params.lateral_A < lateral_needed:
+                open_questions.append({
+                    "parameter": "lateral_A",
+                    "assumed": str(params.lateral_A),
+                    "why_it_matters": f"smaller than the {lateral_needed:.0f} Å the beam/k-resolution rules ask for ({'; '.join(lateral_reasons)})",
+                })
+        else:
+            lateral = add("lateral_A", round(lateral_needed, 1), "default",
+                          "; ".join(lateral_reasons) or "working floor for a periodic cell",
+                          ask="sample lateral size was not specified")
+
+        # Probe scanning (STEM techniques).
+        probe_grid = None
+        if stem:
+            step = params.scan_step_A or d1 / (2.0 * params.probe_oversample)
+            add("scan_step_A", round(step, 4),
+                "supplied" if params.scan_step_A else "derived",
+                f"{params.probe_oversample}× the Nyquist step of the first Bragg spacing d = {d1:.2f} Å — enough pixels per atom")
+            scan = params.scan_extent_A or 2.0 * d1
+            add("scan_extent_A", round(scan, 2),
+                "supplied" if params.scan_extent_A else "default",
+                "a couple of projected unit cells — the lattice repeats beyond that",
+                ask="larger maps cost probes ∝ extent²")
+            n_probe = max(2, int(math.ceil(scan / step)) + 1)
+            probe_grid = {"x": [0.0, round(scan, 2), n_probe], "y": [0.0, round(scan, 2), n_probe]}
+            add("probe_grid", f"{n_probe}×{n_probe}", "derived", "scan extent / step per axis")
+
+        # Output layers through the thickness.
+        return_layers: Any = -1
+        if params.slice_output_interval_A and thickness:
+            n_total = max(1, round(thickness / slice_thickness))
+            every = max(1, round(params.slice_output_interval_A / slice_thickness))
+            return_layers = list(range(every - 1, n_total, every))
+            if (n_total - 1) not in return_layers:
+                return_layers.append(n_total - 1)
+            add("return_layers", f"{len(return_layers)} slices every {params.slice_output_interval_A:.0f} Å",
+                "supplied", "wavefunction kept at each requested depth (plus the exit plane)")
+        elif technique == "haadf":
+            return_layers = None
+            add("return_layers", "none (on-the-fly ADF)", "derived",
+                "HAADF integrates during the run; storing wavefunctions is unnecessary")
+        else:
+            add("return_layers", "exit wave", "default", "only the exit plane is needed")
+
+        # Thermal model.
+        if params.thermal:
+            thermal = add("thermal", params.thermal, "supplied", "requested thermal model")
+        elif tacaw:
+            thermal = add("thermal", "md", "derived", "phonon spectroscopy needs real dynamics — MD, not static displacements")
+        elif technique in ("haadf", "4dstem"):
+            thermal = add("thermal", "frozen_phonon", "default",
+                          "thermal diffuse scattering matters for quantitative STEM contrast",
+                          ask="static is faster; MD adds correlated vibrations")
+        else:
+            thermal = add("thermal", "static", "default", "single static pattern; add frozen phonon for TDS realism",
+                          ask="no thermal motion was requested")
+
+        thermal_plan: Dict[str, Any]
+        if thermal == "md":
+            f_max = params.max_frequency_THz or 30.0
+            f_res = params.frequency_resolution_THz or 0.3
+            add("max_frequency_THz", f_max, "supplied" if params.max_frequency_THz else "default",
+                "highest phonon frequency to resolve",
+                ask="material-dependent (graphene optical modes reach ~48 THz)")
+            add("frequency_resolution_THz", f_res, "supplied" if params.frequency_resolution_THz else "default",
+                "frequency-bin width")
+            dt = 1.0 / (2.0 * f_max)
+            n_frames = int(math.ceil(1.0 / (f_res * dt)))
+            thermal_plan = {
+                "kind": "md",
+                "frame_spacing_ps": round(dt, 5),
+                "n_frames": n_frames,
+                "total_time_ps": round(dt * n_frames, 3),
+                "production_ensemble": "nve",
+                "note": f"time Nyquist 1/(2·{f_max:.0f} THz) = {dt * 1e3:.1f} fs; Δf = 1/T ⇒ {n_frames} frames",
+            }
+        elif thermal == "frozen_phonon":
+            thermal_plan = {"kind": "frozen_phonon", "n": 12, "sigma_A": 0.07,
+                            "note": "TDS converges around 8–16 configurations"}
+        else:
+            thermal_plan = {"kind": "static", "n": 1}
+        n_frames_est = thermal_plan.get("n_frames", thermal_plan.get("n", 1))
+        add("frames", n_frames_est, "derived", thermal_plan.get("note", "one static frame"))
+
+        build_plan: Optional[Dict[str, Any]] = None
+        if params.zone_axis or thickness or not params.lateral_A:
+            build_plan = {
+                "tool": "pyslice_build_slab",
+                "indices": params.zone_axis or [0, 0, 1],
+                "thickness_A": thickness,
+                "min_lateral_A": lateral,
+                "note": "exactly periodic ASE-built slab; frozen-phonon/MD frames come after the build",
+            }
+            if params.zone_axis:
+                add("zone_axis", params.zone_axis, "supplied", "beam-orientation Miller indices for the slab build")
+
+        setup: Dict[str, Any] = {
+            "aperture_mrad": aperture,
+            "voltage_eV": voltage,
+            "sampling_A": sampling,
+            "slice_thickness_A": slice_thickness,
+            "return_layers": return_layers,
+            "max_kx": round(k_max, 4),
+            "max_ky": round(k_max, 4),
+        }
+        if probe_grid:
+            setup["probe_grid"] = probe_grid
+        if detector and technique == "haadf":
+            setup["adf"] = detector
+
+        postprocess: List[str] = []
+        if technique == "haadf":
+            postprocess += ["pyslice_compute_haadf (detector angles above) → PNG", "pyslice_export_sea"]
+        elif technique == "4dstem":
+            postprocess += [
+                "pyslice_export_sea (full 4D-STEM datacube)",
+                "pyslice_compute_haadf with a default annulus for a quick real-space visual",
+                "pyslice_render_signal on the datacube (mean CBED)",
+            ]
+        elif technique in ("diffraction", "tem_imaging"):
+            postprocess += ["pyslice_render_signal (diffraction pattern / exit wave)", "pyslice_export_sea"]
+        if tacaw:
+            postprocess += [
+                "pyslice_compute_tacaw (Bose-correct with the MD temperature) → export the full (qx, qy, E) datacube",
+                "pyslice_tacaw_spectrum → dominant phonon peaks",
+                "pyslice_spectral iso-energy maps at the dominant peaks (spectral_diffraction)",
+            ]
+        if technique == "tacaw_dispersion":
+            path = self._high_symmetry_path(trajectory.box_matrix)
+            postprocess.append(
+                f"pyslice_dispersion along {path['labels']} (points in the plan) + PNG"
+            )
+        else:
+            path = None
+        if technique == "tacaw_spectrum_image":
+            postprocess.append("pyslice_spectrum_image at the mode of interest → real-space phonon map")
+
+        n_probes = probe_grid["x"][2] ** 2 if probe_grid else 1
+        nx = int(lateral / sampling) + 1
+        n_layers = len(return_layers) if isinstance(return_layers, list) else 1
+        est_gib = round(n_probes * n_frames_est * min(nx, int(2 * k_max * lateral) + 1) ** 2 * n_layers * 8 / 1024**3, 3)
+
+        result: Dict[str, Any] = {
+            "technique": technique,
+            "structure": {
+                "handle": params.structure_handle,
+                "n_atoms": trajectory.n_atoms,
+                "extent_A": [round(float(v), 3) for v in trajectory.extent],
+                "first_bragg_g_invA": round(g1, 4),
+                "d_first_A": round(d1, 4),
+            },
+            "parameters": table,
+            "build_plan": build_plan,
+            "thermal_plan": thermal_plan,
+            "simulation_setup": setup,
+            "postprocess_plan": postprocess,
+            "open_questions": open_questions,
+            "estimated_wavefunction_GiB": est_gib,
+            "next_step": "Present the parameters and open questions for confirmation, then execute: build → thermal frames → setup → run → post-process → render → export.",
+        }
+        if path:
+            result["k_path"] = path
+        return result
+
+    def _high_symmetry_path(self, box_matrix: np.ndarray) -> Dict[str, Any]:
+        """Return the standard high-symmetry k-path for a cell in 1/Å.
+
+        Uses ASE's band-path machinery on the unit cell; falls back to a
+        Γ→(g,0) segment when ASE cannot classify the lattice.
+
+        Parameters
+        ----------
+        box_matrix : numpy.ndarray
+            3x3 unit-cell matrix, lattice vectors in rows (Å).
+
+        Returns
+        -------
+        dict
+            ``labels`` (e.g. ``"GMKG"``) and ``points_invA`` mapping each
+            label to its in-plane (kx, ky) in cycles/Å — the same units as
+            PySlice k-axes.
+        """
+        from ..io.build import first_bragg_g, reciprocal_cell
+
+        try:
+            from ase.cell import Cell
+
+            bandpath = Cell(np.asarray(box_matrix, dtype=float)).bandpath(npoints=0)
+            recip = reciprocal_cell(box_matrix)
+            points: Dict[str, List[float]] = {}
+            seen: List[Tuple[float, float]] = []
+            # In-plane points first so out-of-plane duplicates (A over G,
+            # H over K, ...) are the ones dropped.
+            ordered = sorted(bandpath.special_points.items(), key=lambda kv: abs(float(np.asarray(kv[1])[2])))
+            for label, frac in ordered:
+                kx, ky = (np.asarray(frac) @ recip)[:2]
+                key = (round(float(kx), 4), round(float(ky), 4))
+                if key in seen:
+                    continue
+                seen.append(key)
+                points[label] = [key[0], key[1]]
+            labels_list: List[str] = []
+            for label in bandpath.path:
+                if not label.isalnum():  # ',' starts a disconnected 3D segment
+                    break
+                if label in points and (not labels_list or labels_list[-1] != label):
+                    labels_list.append(label)
+            return {"labels": "".join(labels_list), "points_invA": points}
+        except Exception:
+            g1 = first_bragg_g(box_matrix)
+            return {"labels": "GX", "points_invA": {"G": [0.0, 0.0], "X": [round(g1, 4), 0.0]}}
 
     # ------------------------------------------------------------------
     # Simulation execution
@@ -1704,6 +2273,277 @@ class PySliceService:
             payload["png_path"] = str(png_path)
         return payload
 
+    def render_signal(self, params: RenderSignalInput) -> Dict[str, Any]:
+        """Render a result handle with sea-eco's plotting stack.
+
+        Uses ``Signal.show`` (WFData/HAADFData/TACAWData are sea-eco
+        Signals) so the visual carries calibrated axes; bare array handles
+        fall back to a plain heatmap.
+
+        Parameters
+        ----------
+        params : RenderSignalInput
+            Handle, output path, backend, and plot options.
+
+        Returns
+        -------
+        dict
+            Handle and written artifact path.
+
+        Raises
+        ------
+        KeyError
+            If the handle is unknown.
+        RuntimeError
+            If sea-eco plotting fails; the message names the fallback.
+        """
+        obj = self._get(params.handle)
+        target = self._workspace_path(params.filename)
+        if isinstance(obj, np.ndarray):
+            self._save_heatmap(obj, str(target), title=params.handle, xlabel="axis 1", ylabel="axis 0")
+            return {"handle": params.handle, "artifact_path": str(target), "renderer": "heatmap"}
+
+        import matplotlib
+
+        matplotlib.use("Agg", force=False)
+        try:
+            if params.backend == "plotly":
+                figure = obj.show(dims=params.dims, backend="plotly", **params.kwargs)
+                html_target = target if target.suffix == ".html" else target.with_suffix(".html")
+                figure.write_html(str(html_target))
+                return {"handle": params.handle, "artifact_path": str(html_target), "renderer": "sea-eco plotly"}
+            obj.show(dims=params.dims, filename=str(target), backend="matplotlib", **params.kwargs)
+        except Exception as exc:
+            raise RuntimeError(
+                f"sea-eco rendering failed for {params.handle!r}: {exc}. "
+                "Try dims='det' (or explicit indices), or render a derived 2-D array handle instead."
+            ) from exc
+        import matplotlib.pyplot as plt
+
+        plt.close("all")
+        return {"handle": params.handle, "artifact_path": str(target), "renderer": "sea-eco matplotlib"}
+
+    def export_sea_file(self, params: ExportSeaFileInput) -> Dict[str, Any]:
+        """Package results and materials provenance into one SEAFile.
+
+        Simulation results land in ``SEAFile.Simulations``; the unit cell
+        goes into ``SEAFile.Materials`` as the *Material* entry (database
+        origin under ``Metadata.Database``) and the built structure as the
+        *Sample* entry (build record under ``Metadata.build``), with the
+        Sample's SEAID rooted at the Material's — the provenance relation.
+
+        Parameters
+        ----------
+        params : ExportSeaFileInput
+            Output path, result handles, and material/sample handles.
+
+        Returns
+        -------
+        dict
+            Written path plus the Materials entries and their SEAIDs.
+
+        Raises
+        ------
+        KeyError
+            If a handle is unknown.
+        TypeError
+            If a result handle is not a sea-eco Signal.
+        ImportError
+            If sea-eco is not installed.
+        """
+        from pySEA.sea_eco.architecture.base_structure import SEAFile, SEAID, Signal
+
+        from ..multislice.trajectory import Trajectory
+
+        signals = []
+        for handle in params.signal_handles:
+            obj = self._get(handle)
+            if not isinstance(obj, Signal):
+                raise TypeError(f"Handle {handle!r} is {type(obj).__name__}, not a sea-eco Signal.")
+            signals.append(self._as_plain_signal(obj))
+
+        materials = []
+        payload: Dict[str, Any] = {}
+        material_name = None
+        if params.material_handle:
+            material = self._require_type(params.material_handle, Trajectory)
+            material_name = params.material_name or "Material"
+            materials.append(self._trajectory_to_signal(
+                material,
+                name=material_name,
+                kind="Material",
+                source=self._source_info.get(params.material_handle),
+            ))
+        if params.sample_handle:
+            sample = self._require_type(params.sample_handle, Trajectory)
+            materials.append(self._trajectory_to_signal(
+                sample,
+                name="Sample",
+                kind="Sample",
+                source=self._source_info.get(params.sample_handle),
+                build=self._build_records.get(params.sample_handle),
+            ))
+
+        metadata = {"General": {"generator": "pyslice.mcp", "description": params.name or "PySlice simulation"}}
+        if params.metadata:
+            metadata.update(params.metadata)
+        sea_file = SEAFile(
+            name=params.name or Path(params.filename).stem,
+            metadata=metadata,
+            simulations=signals,
+            materials=materials if materials else None,
+        )
+        # Link provenance on the collection's OWN datasets: adding to a
+        # SignalCollection deep-copies and re-mints SEAIDs, so a relation set
+        # on the pre-copy objects would dangle.
+        if materials:
+            stored = list(sea_file.Materials.datasets)
+            stored_material = next((d for d in stored if d.name == material_name), None)
+            stored_sample = next((d for d in stored if d.name == "Sample"), None)
+            if stored_material is not None:
+                payload["material_seaid"] = str(stored_material.Provenance)
+            if stored_sample is not None:
+                if stored_material is not None:
+                    stored_sample.Provenance = SEAID(root=str(stored_material.Provenance))
+                payload["sample_seaid"] = str(stored_sample.Provenance)
+        target = self._workspace_path(params.filename if params.filename.endswith(".sea") else f"{params.filename}.sea")
+        sea_file.to_sea(str(target))
+        payload.update({
+            "sea_path": str(target),
+            "simulations": [type(s).__name__ for s in signals],
+            "materials": [s.name for s in materials],
+        })
+        return payload
+
+    @staticmethod
+    def _as_plain_signal(obj: Any):
+        """Return a plain sea-eco Signal copy of a PySlice result object.
+
+        WFData/HAADFData/TACAWData subclass Signal but bypass its
+        constructor, so sea-eco's generic reloader cannot re-instantiate
+        them from inside a SEAFile. A plain Signal carrying the same data,
+        calibrated dimensions, metadata, and name is readable by every
+        ecosystem consumer without PySlice installed.
+
+        Parameters
+        ----------
+        obj : Any
+            A sea-eco Signal or a PySlice result object.
+
+        Returns
+        -------
+        pySEA.sea_eco.architecture.base_structure.Signal
+            The object itself when it is already a plain Signal, otherwise a
+            converted copy.
+
+        Raises
+        ------
+        ImportError
+            If sea-eco is not installed.
+        """
+        from pySEA.sea_eco.architecture.base_structure import Metadata, Signal
+
+        if type(obj) is Signal:
+            return obj
+        dimensions = getattr(obj, "_local_dimensions", None)
+        if dimensions is None:
+            dimensions = getattr(obj, "dimensions", None)
+        metadata = getattr(obj, "metadata", None)
+        if metadata is not None and not isinstance(metadata, Metadata):
+            metadata = Metadata(metadata)
+        return Signal(
+            data=np.asarray(obj.data),
+            name=getattr(obj, "name", type(obj).__name__),
+            dimensions=dimensions,
+            metadata=metadata,
+            signal_type="Image",
+        )
+
+    def _trajectory_to_signal(
+        self,
+        trajectory: Any,
+        name: str,
+        kind: str,
+        source: Optional[Dict[str, Any]] = None,
+        build: Optional[Dict[str, Any]] = None,
+    ):
+        """Convert a trajectory to a calibrated sea-eco Signal for Materials.
+
+        Positions ``(n_frames, n_atoms, 3)`` become the Signal data with a
+        ps time axis; element symbols, the box matrix, and formula land in
+        ``Metadata.Material``, database origin in ``Metadata.Database``, and
+        the build record — when given — under ``Metadata.build`` (the agreed
+        Sample layout).
+
+        Parameters
+        ----------
+        trajectory : Trajectory
+            Structure to convert.
+        name : str
+            Signal name (e.g. "Material", "Sample", or the formula).
+        kind : str
+            "Material" or "Sample" (recorded in metadata).
+        source : dict | None, optional
+            Database origin info (provider, entry id, CIF path).
+        build : dict | None, optional
+            Build record for ``Metadata.build``.
+
+        Returns
+        -------
+        pySEA.sea_eco.architecture.base_structure.Signal
+            Calibrated atomic-positions Signal.
+
+        Raises
+        ------
+        ImportError
+            If sea-eco is not installed.
+
+        Notes
+        -----
+        The data layout (positions with time/atom/component axes) should be
+        reconciled with the ecosystem's atomic-structure format when that
+        spec lands; the metadata keys (``Material``, ``Database``,
+        ``build``) are the stable part.
+        """
+        from collections import Counter
+
+        from pySEA.sea_eco.architecture.base_structure import Dimension, Dimensions, Metadata, Signal
+
+        from ..io.build import atom_symbols
+
+        symbols = atom_symbols(trajectory)
+        counts = Counter(symbols)
+        formula = "".join(f"{el}{n if n > 1 else ''}" for el, n in sorted(counts.items()))
+        dims = Dimensions([
+            Dimension(name="time", space="temporal", units="ps",
+                      values=np.arange(trajectory.n_frames) * (trajectory.timestep or 0.0)),
+            Dimension(name="atom", space="position", values=np.arange(trajectory.n_atoms)),
+            Dimension(name="component", space="position", units="Å", values=np.arange(3)),
+        ], nav_dimensions=[0], det_dimensions=[1, 2])
+        metadata: Dict[str, Any] = {
+            "Material": {
+                "kind": kind,
+                "formula": formula,
+                "elements": {element: int(n) for element, n in sorted(counts.items())},
+                "atom_symbols": list(symbols),
+                "box_matrix_A": np.asarray(trajectory.box_matrix, dtype=float).tolist(),
+                "n_atoms": int(trajectory.n_atoms),
+                "n_frames": int(trajectory.n_frames),
+                "timestep_ps": float(trajectory.timestep or 0.0),
+            },
+        }
+        if source:
+            metadata["Database"] = dict(source)
+        if build:
+            metadata["build"] = dict(build)
+        return Signal(
+            data=np.asarray(trajectory.positions, dtype=np.float32),
+            name=name,
+            dimensions=dims,
+            metadata=Metadata(metadata),
+            signal_type="Image",
+        )
+
     def export_sea(self, handle: str, filename: str) -> Dict[str, Any]:
         """Export a simulation result to a ``.sea`` file.
 
@@ -1885,8 +2725,8 @@ class PySliceService:
     def _atom_symbols(trajectory: Any) -> List[str]:
         """Return element symbols for a trajectory's atom types.
 
-        Normalizes the atom_types str/int gotcha: string types pass through,
-        integer types are treated as atomic numbers.
+        Delegates to :func:`pyslice.io.build.atom_symbols`, the canonical
+        normalization of the atom_types str/int gotcha.
 
         Parameters
         ----------
@@ -1903,23 +2743,14 @@ class PySliceService:
         ValueError
             If an integer type is not a valid atomic number.
         """
-        from ..multislice.potentials import _ELEMENTS
+        from ..io.build import atom_symbols
 
-        symbols: List[str] = []
-        for atom_type in trajectory.atom_types:
-            if isinstance(atom_type, (str, np.str_)):
-                symbols.append(str(atom_type))
-            else:
-                z = int(atom_type)
-                if not 1 <= z <= len(_ELEMENTS):
-                    raise ValueError(
-                        f"atom type {z} is not a valid atomic number; pass atom_mapping when loading LAMMPS files."
-                    )
-                symbols.append(_ELEMENTS[z - 1])
-        return symbols
+        return atom_symbols(trajectory)
 
     def _trajectory_to_ase(self, trajectory: Any):
         """Convert a trajectory's first frame to ASE atoms with symbol types.
+
+        Delegates to :func:`pyslice.io.build.trajectory_to_ase`.
 
         Parameters
         ----------
@@ -1936,10 +2767,9 @@ class PySliceService:
         ValueError
             If atom types cannot be resolved to element symbols.
         """
-        from ase import Atoms
+        from ..io.build import trajectory_to_ase
 
-        symbols = self._atom_symbols(trajectory)
-        return Atoms(symbols, positions=trajectory.positions[0], cell=trajectory.box_matrix, pbc=True)
+        return trajectory_to_ase(trajectory)
 
     @staticmethod
     def _save_heatmap(array: np.ndarray, filename: str, title: str, xlabel: str, ylabel: str) -> None:

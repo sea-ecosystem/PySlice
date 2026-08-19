@@ -61,6 +61,7 @@ class TACAWData(PySliceSerial, Signal):
                  apply_bose: bool = False) -> None:
 
         self._backend = wf_data._backend
+        self.name = 'TACAW'
 
         # Copy coordinate metadata from WFData
         self.probe_positions = wf_data.probe_positions

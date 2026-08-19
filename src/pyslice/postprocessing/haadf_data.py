@@ -44,6 +44,7 @@ class HAADFData(PySliceSerial, Signal):
         """
         # Copy needed attributes from WFData (raw tensors for GPU ops)
         self._backend = wf_data._backend
+        self.name = 'HAADF'
         self.probe_positions = wf_data.probe_positions
         self._kxs = wf_data._kxs
         self._kys = wf_data._kys

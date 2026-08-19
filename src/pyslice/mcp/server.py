@@ -16,15 +16,19 @@ except ImportError:  # mcp>=2.0 renamed FastMCP to MCPServer with the same tool 
     from mcp.server import MCPServer as FastMCP
 
 from pyslice.mcp.service import (
+    BuildSlabInput,
     ComputeHAADFInput,
     ComputeTACAWInput,
     DispersionInput,
+    ExportSeaFileInput,
     ExportSeaInput,
     FetchStructureInput,
     HandleInput,
     LoadStructureInput,
+    PlanSimulationInput,
     PreviewPotentialInput,
     PySliceService,
+    RenderSignalInput,
     ResponseFormat,
     RunMDInput,
     RunMultisliceInput,
@@ -166,11 +170,23 @@ def build_server(
         payload = service.transform_trajectory(params.handle, params.operations, params.name)
         return service.format_response(payload, params.response_format)
 
+    @mcp.tool(name="pyslice_build_slab", annotations=_tool_annotations(False))
+    async def pyslice_build_slab(params: BuildSlabInput) -> str:
+        """Build an exactly periodic beam-oriented slab (ASE surface + orthogonalized cell) from a unit-cell handle — no carved edges."""
+
+        return service.format_response(service.build_slab(params), params.response_format)
+
     @mcp.tool(name="pyslice_suggest_parameters", annotations=_tool_annotations(True))
     async def pyslice_suggest_parameters(params: SuggestParametersInput) -> str:
         """Suggest justified multislice parameters (sampling, slices, tiling, probes, frames) for a goal and structure."""
 
         return service.format_response(service.suggest_parameters(params), params.response_format)
+
+    @mcp.tool(name="pyslice_plan_simulation", annotations=_tool_annotations(True))
+    async def pyslice_plan_simulation(params: PlanSimulationInput) -> str:
+        """Turn a structured simulation request into a full confirmable plan: parameter table with supplied/derived/default origins, build + thermal + setup + post-processing plans, and open questions. Present it for confirmation before executing."""
+
+        return service.format_response(service.plan_simulation(params), params.response_format)
 
     @mcp.tool(name="pyslice_run_md", annotations=_tool_annotations(False))
     async def pyslice_run_md(params: RunMDInput) -> str:
@@ -227,11 +243,23 @@ def build_server(
 
         return service.format_response(service.preview_potential(params), params.response_format)
 
+    @mcp.tool(name="pyslice_render_signal", annotations=_tool_annotations(False))
+    async def pyslice_render_signal(params: RenderSignalInput) -> str:
+        """Render a result handle with sea-eco plotting (calibrated axes) to a PNG or plotly HTML artifact."""
+
+        return service.format_response(service.render_signal(params), params.response_format)
+
     @mcp.tool(name="pyslice_export_sea", annotations=_tool_annotations(False))
     async def pyslice_export_sea(params: ExportSeaInput) -> str:
         """Export a WFData/HAADFData/TACAWData handle to a calibrated .sea file readable across the pySEA ecosystem."""
 
         return service.format_response(service.export_sea(params.handle, params.filename), params.response_format)
+
+    @mcp.tool(name="pyslice_export_sea_file", annotations=_tool_annotations(False))
+    async def pyslice_export_sea_file(params: ExportSeaFileInput) -> str:
+        """Package results + materials provenance into one SEAFile: Simulations plus Materials entries (Material with database info, Sample with Metadata.build, Sample rooted at Material)."""
+
+        return service.format_response(service.export_sea_file(params), params.response_format)
 
     return mcp
 
