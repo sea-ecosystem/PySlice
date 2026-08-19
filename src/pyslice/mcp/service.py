@@ -2368,7 +2368,7 @@ class PySliceService:
         if params.material_handle:
             material = self._require_type(params.material_handle, Trajectory)
             material_name = params.material_name or "Material"
-            materials.append(self._trajectory_to_signal(
+            materials.append(self._trajectory_to_material_set(
                 material,
                 name=material_name,
                 kind="Material",
@@ -2376,7 +2376,7 @@ class PySliceService:
             ))
         if params.sample_handle:
             sample = self._require_type(params.sample_handle, Trajectory)
-            materials.append(self._trajectory_to_signal(
+            materials.append(self._trajectory_to_material_set(
                 sample,
                 name="Sample",
                 kind="Sample",
@@ -2459,7 +2459,7 @@ class PySliceService:
             signal_type="Image",
         )
 
-    def _trajectory_to_signal(
+    def _trajectory_to_material_set(
         self,
         trajectory: Any,
         name: str,
@@ -2467,20 +2467,25 @@ class PySliceService:
         source: Optional[Dict[str, Any]] = None,
         build: Optional[Dict[str, Any]] = None,
     ):
-        """Convert a trajectory to a calibrated sea-eco Signal for Materials.
+        """Convert a trajectory to a SignalSet in the atom-record format.
 
-        Positions ``(n_frames, n_atoms, 3)`` become the Signal data with a
-        ps time axis; element symbols, the box matrix, and formula land in
+        Follows sea-eco's canonical atomic-structure layout (the
+        signal-quantities/SignalSet-slicing design): heterogeneous atom
+        records are a ``SignalSet`` of typed members sharing the ``atom``
+        dimension — a ``positions`` member ``(time, atom, component)`` whose
+        component axis is the categorical, role-unassigned
+        ``Signal.build_component_dimension(['x', 'y', 'z'], units='Å')``, an
+        ``element`` member of symbol strings, and a ``velocities`` member
+        when the trajectory carries any. The formula/box land in
         ``Metadata.Material``, database origin in ``Metadata.Database``, and
-        the build record — when given — under ``Metadata.build`` (the agreed
-        Sample layout).
+        the build record under ``Metadata.build`` (the agreed Sample layout).
 
         Parameters
         ----------
         trajectory : Trajectory
             Structure to convert.
         name : str
-            Signal name (e.g. "Material", "Sample", or the formula).
+            Set name (e.g. "Material", "Sample", or the formula).
         kind : str
             "Material" or "Sample" (recorded in metadata).
         source : dict | None, optional
@@ -2490,44 +2495,78 @@ class PySliceService:
 
         Returns
         -------
-        pySEA.sea_eco.architecture.base_structure.Signal
-            Calibrated atomic-positions Signal.
+        pySEA.sea_eco.architecture.base_structure.SignalSet
+            Atom-record set (`set['positions']`, `set['element']`, ...).
 
         Raises
         ------
         ImportError
             If sea-eco is not installed.
 
+        See Also
+        --------
+        pySEA.sea_eco...Signal.build_component_dimension : Component axis.
+        pySEA.sea_eco...Signal.split_components_to_set : The set-form rule.
+
         Notes
         -----
-        The data layout (positions with time/atom/component axes) should be
-        reconciled with the ecosystem's atomic-structure format when that
-        spec lands; the metadata keys (``Material``, ``Database``,
-        ``build``) are the stable part.
+        The access grammar applies to the result: ``set['positions']``
+        selects a member, ``set(atom=(0, 10))`` slices calibrated ranges.
         """
         from collections import Counter
 
-        from pySEA.sea_eco.architecture.base_structure import Dimension, Dimensions, Metadata, Signal
+        from pySEA.sea_eco.architecture.base_structure import Dimension, Dimensions, Metadata, Signal, SignalSet
 
         from ..io.build import atom_symbols
 
         symbols = atom_symbols(trajectory)
         counts = Counter(symbols)
         formula = "".join(f"{el}{n if n > 1 else ''}" for el, n in sorted(counts.items()))
-        dims = Dimensions([
-            Dimension(name="time", space="temporal", units="ps",
-                      values=np.arange(trajectory.n_frames) * (trajectory.timestep or 0.0)),
-            Dimension(name="atom", space="position", values=np.arange(trajectory.n_atoms)),
-            Dimension(name="component", space="position", units="Å", values=np.arange(3)),
-        ], nav_dimensions=[0], det_dimensions=[1, 2])
+        n_atoms = int(trajectory.n_atoms)
+
+        def _atom_dimension() -> Any:
+            """Return a fresh ``atom`` index dimension for one member."""
+            return Dimension(name="atom", size=n_atoms, scale=1.0, offset=0.0)
+
+        def _time_dimension() -> Any:
+            """Return a fresh calibrated ``time`` dimension for one member."""
+            return Dimension(
+                name="time", space="temporal", units="ps",
+                values=np.arange(trajectory.n_frames) * (trajectory.timestep or 0.0),
+            )
+
+        members = [Signal(
+            data=np.asarray(trajectory.positions, dtype=np.float32),
+            name="positions",
+            dimensions=Dimensions(
+                [_time_dimension(), _atom_dimension(),
+                 Signal.build_component_dimension(["x", "y", "z"], units="Å")],
+                nav_dimensions=[0, 1],  # component axis stays role-unassigned
+            ),
+        ), Signal(
+            data=np.asarray(symbols),
+            name="element",
+            dimensions=Dimensions([_atom_dimension()], nav_dimensions=[0]),
+        )]
+        velocities = np.asarray(trajectory.velocities, dtype=np.float32)
+        if np.any(velocities):
+            members.append(Signal(
+                data=velocities,
+                name="velocities",
+                dimensions=Dimensions(
+                    [_time_dimension(), _atom_dimension(),
+                     Signal.build_component_dimension(["x", "y", "z"], units="Å/ps")],
+                    nav_dimensions=[0, 1],
+                ),
+            ))
+
         metadata: Dict[str, Any] = {
             "Material": {
                 "kind": kind,
                 "formula": formula,
                 "elements": {element: int(n) for element, n in sorted(counts.items())},
-                "atom_symbols": list(symbols),
                 "box_matrix_A": np.asarray(trajectory.box_matrix, dtype=float).tolist(),
-                "n_atoms": int(trajectory.n_atoms),
+                "n_atoms": n_atoms,
                 "n_frames": int(trajectory.n_frames),
                 "timestep_ps": float(trajectory.timestep or 0.0),
             },
@@ -2536,13 +2575,7 @@ class PySliceService:
             metadata["Database"] = dict(source)
         if build:
             metadata["build"] = dict(build)
-        return Signal(
-            data=np.asarray(trajectory.positions, dtype=np.float32),
-            name=name,
-            dimensions=dims,
-            metadata=Metadata(metadata),
-            signal_type="Image",
-        )
+        return SignalSet(signals=members, name=name, metadata=Metadata(metadata))
 
     def export_sea(self, handle: str, filename: str) -> Dict[str, Any]:
         """Export a simulation result to a ``.sea`` file.

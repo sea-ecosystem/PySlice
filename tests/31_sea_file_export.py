@@ -88,9 +88,22 @@ def test_sea_file_round_trip_materials_and_provenance(packaged):
     operations = [json.loads(str(op)) for op in build.operations]
     assert operations[-1]["op"] == "frozen_phonon"
 
-    # positions Signal shape: (frames, atoms, xyz) with a ps time axis
-    assert sample.data.shape[2] == 3
-    assert sample.data.shape[0] == 2  # frozen-phonon frames
+    # Atom-record format (sea-eco SignalSet layout): typed members sharing
+    # the atom dimension, positions with a categorical component axis.
+    assert type(sample).__name__ == "SignalSet"
+    member_names = sample.get_dataset_names()
+    assert member_names[:2] == ["positions", "element"]
+    positions = sample["positions"]
+    assert positions.data.shape[0] == 2  # frozen-phonon frames
+    assert positions.data.shape[2] == 3
+    component = positions._local_dimensions.dimensions[2]
+    assert [str(v) for v in component.values] == ["x", "y", "z"]
+    # component axis is structural: role-unassigned (neither nav nor det)
+    assert 2 not in positions._local_dimensions.nav_dimensions
+    assert 2 not in positions._local_dimensions.det_dimensions
+    elements = sample["element"]
+    assert set(str(e) for e in elements.data) == {"C"}
+    assert len(elements.data) == positions.data.shape[1]
 
 
 def test_simulation_signal_is_plain_and_calibrated(packaged):
@@ -129,7 +142,7 @@ def test_database_source_flows_into_material_metadata(service, tmp_path, monkeyp
         ),
     )
     fetched = service.fetch_structure("cod", "12345", None, True, None, None)
-    signal = service._trajectory_to_signal(
+    signal = service._trajectory_to_material_set(
         service._get(fetched["handle"]), name="Material", kind="Material",
         source=service._source_info[fetched["handle"]],
     )

@@ -110,6 +110,12 @@ subagents are the workers. The parameter physics lives ONCE, in
   `Metadata.Database`) and Sample (built structure, `Metadata.build`) in
   `Materials`, Sample's SEAID rooted at the Material's. Link provenance on
   the collection's own datasets — adding deep-copies and re-mints SEAIDs.
+- **Materials entries use sea-eco's atom-record format** (the
+  signal-quantities/SignalSet-slicing design): a `SignalSet` of typed
+  members sharing the `atom` dimension — `positions` (time, atom,
+  component) with `Signal.build_component_dimension(['x','y','z'], 'Å')`
+  as a **role-unassigned** categorical axis, `element` as a string member,
+  `velocities` when present. Never mark a component axis nav/det.
 - **Every frame is propagated** — frame count = frozen-phonon configs or MD
   snapshots.
 - **Blocking compute:** `MultisliceCalculator.run()` and MD `run()` block
