@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 
 from ..multislice.multislice import Probe, aberrationFunction
 from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.seashell import adopt_signal_state
 from pyslice.backend import Backend, to_numpy
 
 
@@ -48,7 +49,6 @@ class WFData(PySliceSerial, Signal):
         cache_dir: Optional[Path] = None,
     ):
         self._backend = backend
-        self.name = 'Wavefunction'
 
         self.probe_positions = probe_positions
         self.probe_xs = probe_xs
@@ -97,6 +97,7 @@ class WFData(PySliceSerial, Signal):
                     'n_probes': len(probe_positions),
                 },
             })
+        adopt_signal_state(self, 'Wavefunction')
 
     # ------------------------------------------------------------------
     # Properties — public interface always returns numpy

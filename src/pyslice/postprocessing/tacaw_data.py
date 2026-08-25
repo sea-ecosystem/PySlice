@@ -13,6 +13,7 @@ from tqdm import tqdm
 
 from .wf_data import WFData
 from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.seashell import adopt_signal_state
 from pyslice.backend import Backend, to_numpy
 
 logger = logging.getLogger(__name__)
@@ -61,7 +62,6 @@ class TACAWData(PySliceSerial, Signal):
                  apply_bose: bool = False) -> None:
 
         self._backend = wf_data._backend
-        self.name = 'TACAW'
 
         # Copy coordinate metadata from WFData
         self.probe_positions = wf_data.probe_positions
@@ -113,6 +113,7 @@ class TACAWData(PySliceSerial, Signal):
                 },
             })
             self.sea_type = "Signal"
+        adopt_signal_state(self, 'TACAW')
 
     # ------------------------------------------------------------------
     # Properties

@@ -7,6 +7,7 @@ from pathlib import Path
 import logging
 from .wf_data import WFData
 from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.seashell import adopt_signal_state
 from pyslice.backend import Backend, to_numpy
 
 logger = logging.getLogger(__name__)
@@ -44,7 +45,6 @@ class HAADFData(PySliceSerial, Signal):
         """
         # Copy needed attributes from WFData (raw tensors for GPU ops)
         self._backend = wf_data._backend
-        self.name = 'HAADF'
         self.probe_positions = wf_data.probe_positions
         self._kxs = wf_data._kxs
         self._kys = wf_data._kys
@@ -81,6 +81,7 @@ class HAADFData(PySliceSerial, Signal):
             }
             self.metadata = Metadata(metadata_dict)
             self.sea_type="Signal"
+        adopt_signal_state(self, 'HAADF')
 
     @property
     def data(self):

@@ -2351,7 +2351,7 @@ class PySliceService:
         ImportError
             If sea-eco is not installed.
         """
-        from pySEA.sea_eco.architecture.base_structure import SEAFile, SEAID, Signal
+        from ..data.seashell import SEAFile, SEAID, Signal
 
         from ..multislice.trajectory import Trajectory
 
@@ -2441,7 +2441,7 @@ class PySliceService:
         ImportError
             If sea-eco is not installed.
         """
-        from pySEA.sea_eco.architecture.base_structure import Metadata, Signal
+        from ..data.seashell import Metadata, Signal
 
         if type(obj) is Signal:
             return obj
@@ -2467,161 +2467,46 @@ class PySliceService:
         source: Optional[Dict[str, Any]] = None,
         build: Optional[Dict[str, Any]] = None,
     ):
-        """Convert a trajectory to a conforming ``atomic-structure`` collection.
+        """Resolve a trajectory to a SEA ``atomic-structure`` collection.
 
-        Builds the sea-eco ``signal-containers`` schema's ``atomic-structure``
-        profile version 1: a :class:`SignalCollection` root holding an
-        ``atoms`` SignalSet (``position``, ``element``,
-        ``clamp_boundary_condition``, plus ``velocity`` when the trajectory
-        carries any) and a ``cell`` SignalSet (``cell``,
-        ``periodic_boundary_condition``). Coordinate and cell-vector axes are
-        categorical (``x``/``y``/``z`` and ``a``/``b``/``c``), value units live
-        on scalar ``SignalQuantities`` rather than on the component axes, and
-        the root is marked and validated via
-        :func:`pySEA.sea_eco.signal_containers.mark_atomic_structure`.
-
-        Single-frame structures use the profile's static form (no context
-        axis); multi-frame trajectories add a calibrated ``time`` context axis
-        to ``position``. The cell stays static because a PySlice
-        ``Trajectory`` carries one ``box_matrix`` for all frames.
-
-        PySlice provenance rides on the root's metadata: formula and counts in
-        ``Metadata.Material``, database origin in ``Metadata.Database``, and
-        the build record in ``Metadata.build``.
+        Thin delegation to the library resolution layer
+        (:func:`pyslice.data.atomic_structure.trajectory_to_atomic_structure`,
+        reachable implicitly as ``Trajectory.sea``) so the MCP surface holds
+        no schema knowledge of its own.
 
         Parameters
         ----------
         trajectory : Trajectory
-            Structure to convert.
+            Structure to resolve.
         name : str
             Collection name (e.g. "Material", "Sample", or the formula).
         kind : str
-            "Material" or "Sample" (recorded in metadata).
+            "Material" or "Sample", recorded in ``Metadata.Material``.
         source : dict | None, optional
-            Database origin info (provider, entry id, CIF path).
+            Database origin recorded at ``Metadata.Database``.
         build : dict | None, optional
-            Build record for ``Metadata.build``.
+            Build record recorded at ``Metadata.build``.
 
         Returns
         -------
-        pySEA.sea_eco.architecture.base_structure.SignalCollection
+        SignalCollection
             Marked, validated atomic-structure collection.
 
         Raises
         ------
         ImportError
-            If sea-eco (or its ``signal_containers`` module) is unavailable.
+            If sea-eco is not installed.
         ValueError
-            If the assembled collection fails profile validation.
+            If the collection fails profile validation.
 
         See Also
         --------
-        pySEA.sea_eco.signal_containers.validate_atomic_structure : The gate.
-
-        Notes
-        -----
-        PySlice treats every cell as fully periodic (the multislice
-        propagator assumes it), so ``periodic_boundary_condition`` is all
-        True, and no atom is clamped, so ``clamp_boundary_condition`` is all
-        False.
+        pyslice.data.atomic_structure.trajectory_to_atomic_structure : Builder.
         """
-        from collections import Counter
+        from ..data.seashell import resolve
 
-        from pySEA.sea_eco.architecture.base_structure import (
-            Dimension,
-            Dimensions,
-            Metadata,
-            Signal,
-            SignalCollection,
-            SignalQuantities,
-            SignalSet,
-        )
-        from pySEA.sea_eco.signal_containers import mark_atomic_structure
+        return resolve(trajectory, name=name, kind=kind, source=source, build=build)
 
-        from ..io.build import atom_symbols
-
-        symbols = atom_symbols(trajectory)
-        counts = Counter(symbols)
-        formula = "".join(f"{el}{n if n > 1 else ''}" for el, n in sorted(counts.items()))
-        n_atoms = int(trajectory.n_atoms)
-        n_frames = int(trajectory.n_frames)
-        contextual = n_frames > 1
-
-        atom_axis = Dimension(name="atom", size=n_atoms, scale=1, offset=0)
-        coordinate = Dimension(name="coordinate", values=["x", "y", "z"])
-        positions = np.asarray(trajectory.positions, dtype=float)
-        position_axes = [atom_axis.deepcopy(), coordinate.deepcopy()]
-        if contextual:
-            position_axes.insert(0, Dimension(
-                name="time", space="temporal", units="ps",
-                values=np.arange(n_frames) * float(trajectory.timestep or 0.0),
-            ))
-        else:
-            positions = positions[0]
-        members = [
-            Signal(
-                positions,
-                name="position",
-                dimensions=Dimensions(position_axes),
-                signal_quantities=SignalQuantities([Dimension(name="position", units="Å")]),
-            ),
-            Signal(
-                np.asarray([str(symbol) for symbol in symbols]),
-                name="element",
-                dimensions=Dimensions([atom_axis.deepcopy()]),
-            ),
-            Signal(
-                np.zeros(n_atoms, dtype=bool),
-                name="clamp_boundary_condition",
-                dimensions=Dimensions([atom_axis.deepcopy()]),
-            ),
-        ]
-        velocities = np.asarray(trajectory.velocities, dtype=float)
-        if np.any(velocities):
-            velocity_axes = [axis.deepcopy() for axis in position_axes]
-            members.append(Signal(
-                velocities if contextual else velocities[0],
-                name="velocity",
-                dimensions=Dimensions(velocity_axes),
-                signal_quantities=SignalQuantities([Dimension(name="velocity", units="Å/ps")]),
-            ))
-
-        cell_vector = Dimension(name="cell_vector", values=["a", "b", "c"])
-        cell_members = [
-            Signal(
-                np.asarray(trajectory.box_matrix, dtype=float),
-                name="cell",
-                dimensions=Dimensions([cell_vector.deepcopy(), coordinate.deepcopy()]),
-                signal_quantities=SignalQuantities([Dimension(name="cell", units="Å")]),
-            ),
-            Signal(
-                np.ones(3, dtype=bool),
-                name="periodic_boundary_condition",
-                dimensions=Dimensions([cell_vector.deepcopy()]),
-            ),
-        ]
-
-        metadata: Dict[str, Any] = {
-            "Material": {
-                "kind": kind,
-                "formula": formula,
-                "elements": {element: int(n) for element, n in sorted(counts.items())},
-                "n_atoms": n_atoms,
-                "n_frames": n_frames,
-                "timestep_ps": float(trajectory.timestep or 0.0),
-            },
-        }
-        if source:
-            metadata["Database"] = dict(source)
-        if build:
-            metadata["build"] = dict(build)
-
-        structure = SignalCollection(
-            [SignalSet(members, name="atoms"), SignalSet(cell_members, name="cell")],
-            name=name,
-            metadata=Metadata(metadata),
-        )
-        return mark_atomic_structure(structure)
     def export_sea(self, handle: str, filename: str) -> Dict[str, Any]:
         """Export a simulation result to a ``.sea`` file.
 

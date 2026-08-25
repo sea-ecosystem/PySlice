@@ -10,13 +10,17 @@ from pathlib import Path
 from h5py import File, Group, Dataset
 from ..backend import to_numpy
 
-try:
-    from pySEA.sea_eco.architecture.base_structure import Signal, Dimensions, Dimension, Metadata, safe_decode
-except Exception:
-    class Signal:
-        def to_sea(self,*args,**kwargs):
-            raise ImportError("pySEA (sea-eco) is required for .to_sea() serialization")
-    Dimensions,Dimension,Metadata,safe_decode = None,None,None,None
+from .seashell import (
+    Dimension,
+    Dimensions,
+    Metadata,
+    Signal,
+    SignalQuantities,
+    adopt_signal_state,
+    safe_decode,
+    sea_available,
+)
+
 
 def _to_numpy(x):
     """Convert tensor or array-like to numpy array."""
@@ -51,11 +55,6 @@ class PySliceSerial:
 
     _sea_config = {}
 
-    # Fallback display name; Signal.__init__ (bypassed by PySlice data
-    # classes) would normally set an instance attribute. Subclasses set a
-    # specific instance name in their __init__.
-    name = "PySliceData"
-
     @property
     def signal_quantities(self):
         """Lazily provide the ``SignalQuantities`` Signal.__init__ would set.
@@ -72,9 +71,7 @@ class PySliceSerial:
         """
         cached = getattr(self, '_signal_quantities', None)
         if cached is None:
-            try:
-                from pySEA.sea_eco.architecture.base_structure import SignalQuantities
-            except Exception:
+            if SignalQuantities is None:
                 return None
             cached = SignalQuantities()
             self._signal_quantities = cached

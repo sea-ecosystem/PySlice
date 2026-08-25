@@ -61,8 +61,13 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
   (timestep in **fs**; equilibration → production; no cancel hook).
 - `src/pyslice/postprocessing/{wf_data,haadf_data,tacaw_data}.py` — result
   Signals with `.to_sea()`/`.load()`.
-- `src/pyslice/data/pyslice_serial.py` — the sea-eco serialization bridge
-  (`PySliceSerial` mixin importing `pySEA.sea_eco.architecture.base_structure`).
+- `src/pyslice/data/seashell.py` — **the only module that imports sea-eco**.
+  The resolution layer: real containers or dummy stand-ins, `resolve()`,
+  `register_resolver()`, `adopt_signal_state()`.
+- `src/pyslice/data/atomic_structure.py` — Trajectory → `atomic-structure`
+  profile collection (the registered `Trajectory` resolver).
+- `src/pyslice/data/pyslice_serial.py` — `PySliceSerial` HDF5 mixin; gets its
+  sea-eco names from `seashell`, never from `pySEA` directly.
 - `src/pyslice/backend.py` — numpy/torch backend seam (`make_backend`,
   `PYSLICE_DEVICE`, `PYSLICE_BACKEND=numpy`).
 - `src/pyslice/mcp/{service,server}.py` — MCP surface (`python -m pyslice.mcp`).
@@ -129,6 +134,16 @@ subagents are the workers. The parameter physics lives ONCE, in
 - **Blocking compute:** `MultisliceCalculator.run()` and MD `run()` block
   with tqdm and have no cancel hook; native/GPU code can hard-crash the
   process. Run them behind a subprocess/job boundary in host applications.
+- **Results ARE sea-eco objects; resolution is implicit.** With sea-eco
+  importable, `WFData`/`HAADFData`/`TACAWData` are first-class `Signal`s
+  (name, `Provenance`, `Analysis`, dimension signature — via
+  `adopt_signal_state` in each constructor) and `Trajectory.sea` resolves to
+  an `atomic-structure` `SignalCollection`. Never write a conversion step;
+  call `seashell.resolve(obj)` or add a `register_resolver` entry.
+- **`data/seashell.py` is the ONLY sea-eco import site** (rayTEM's
+  `seashells.py` pattern). Everything else imports names from it, so PySlice
+  imports and simulates unchanged when sea-eco is absent — `tests/32` enforces
+  this with a source scan.
 - **Keep the `.sea` bridge stable:** `pyslice_serial.py` and the
   `_sea_config` dicts define the on-disk format; verify against *current*
   sea-eco (`Dimensions(..., det_dimensions=...)`) and round-trip test any
