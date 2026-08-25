@@ -851,19 +851,52 @@ class PySliceService:
     -------
     get_conventions()
         Units, workflow, and gotchas — agents call this first.
-    search_structures(...), fetch_structure(...), load_structure(...)
-        Structure acquisition (databases and files).
-    transform_trajectory(...)
-        Supercell/orientation/frozen-phonon structure building.
-    suggest_parameters(...)
-        Physics-grounded multislice parameter advisor.
-    run_md(...), setup_multislice(...), run_multislice(...)
-        Simulation execution.
-    compute_haadf(...), compute_tacaw(...), tacaw_spectrum(...),
-    spectrum_image(...), dispersion(...), preview_potential(...)
-        Post-processing and previews.
-    export_sea(...)
-        Persist results as ``.sea`` artifacts.
+    get_workspace()
+        Report the workspace root and its subdirectories.
+    list_handles()
+        List every live object handle in the registry.
+    describe_handle(handle)
+        Summarize one registered object.
+    search_structures(provider, formula, elements, limit, api_key)
+        Search Materials Project or COD for structures.
+    fetch_structure(provider, entry_id, filename, load, timestep_ps, api_key)
+        Download a database entry as a CIF and optionally load it.
+    load_structure(path, atom_mapping, timestep_ps)
+        Load a local structure or trajectory file.
+    build_slab(params)
+        Build an exactly periodic, beam-oriented slab.
+    transform_trajectory(handle, operations, name)
+        Supercell, orientation, crop, and frozen-phonon building.
+    plan_simulation(params)
+        Turn a structured request into a confirmable plan.
+    suggest_parameters(params)
+        Physics-grounded multislice parameter advice for one goal.
+    run_md(params)
+        Run ML-potential molecular dynamics.
+    setup_multislice(params)
+        Configure a run and report grid size and memory.
+    run_multislice(calculator_handle, force_rerun)
+        Execute a configured multislice calculation.
+    compute_haadf(params)
+        Integrate an annular dark-field image.
+    compute_tacaw(params)
+        Convert multi-frame wavefunctions to TACAW spectral data.
+    tacaw_spectrum(params)
+        Extract a k-integrated spectrum and its dominant peaks.
+    spectrum_image(params)
+        Map TACAW intensity at one frequency over the probe grid.
+    dispersion(params)
+        Extract a phonon dispersion along a k-path.
+    preview_potential(params)
+        Render the projected potential as a sanity check.
+    render_signal(params)
+        Render a result with sea-eco plotting.
+    export_sea(handle, filename)
+        Persist one result as a ``.sea`` artifact.
+    export_sea_file(params)
+        Package results and materials provenance into one SEAFile.
+    format_response(payload, response_format)
+        Serialize a tool payload as JSON or human-readable text.
 
     Raises
     ------

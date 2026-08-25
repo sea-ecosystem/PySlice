@@ -117,7 +117,7 @@ def orthogonal_supercell_matrix(cell: np.ndarray, max_index: int = 6) -> np.ndar
         3x3 cell matrix, lattice vectors in rows; the third vector must be
         out of plane.
     max_index : int, optional
-        Largest |integer coefficient| searched, by default 6.
+        Largest absolute integer coefficient searched, by default 6.
 
     Returns
     -------
@@ -399,7 +399,8 @@ def first_bragg_g(box_matrix: np.ndarray, max_index: int = 3, in_plane: bool = T
     Returns
     -------
     float
-        |g| of the first reflection in 1/Å (cycles/Å, no 2π).
+        Magnitude of the first reflection's reciprocal vector in 1/Å
+        (cycles/Å, no 2π).
 
     Raises
     ------

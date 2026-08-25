@@ -502,8 +502,11 @@ def search_structures(
 
     References
     ----------
-    .. [1] https://api.materialsproject.org/docs
-    .. [2] https://wiki.crystallography.net/RESTful_API/
+    Materials Project API documentation:
+    https://api.materialsproject.org/docs
+
+    COD RESTful API documentation:
+    https://wiki.crystallography.net/RESTful_API/
     """
     if not formula and not elements:
         raise ValueError("Provide a formula (e.g. 'SiO2') and/or an elements list (e.g. ['Ga', 'N']).")
