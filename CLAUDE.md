@@ -73,6 +73,8 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
 - `src/pyslice/mcp/{service,server}.py` — MCP surface (`python -m pyslice.mcp`).
 - `skills/` — agent skills; `.claude/agents/` — subagents; `tests/` —
   numbered pytest files; `examples/` — runnable technique scripts.
+- `docs/` — Sphinx tree: `guides/`, `sea-weeds/` (developer docs),
+  `ai_tools/`, `conformance/`, `api_reference.rst`.
 
 ## AI tools
 
@@ -169,6 +171,28 @@ graphene dispersion to ±2g) as planning tests — extend it when adding
 intake rules. `tests/16_sea_eco_integration.py` is stale (imports names
 `pyslice.data` no longer exports); the live bridge coverage is in
 `tests/27_mcp_service.py` and `tests/31_sea_file_export.py`.
+
+## Documentation
+
+```bash
+python -m pip install -r docs/requirements.txt
+PYSLICE_DOCS_OFFLINE=1 python -m sphinx -b html -W docs docs/_build/html
+```
+
+Five sections in this order: Guides, Example Notebooks, AI Tools, Into the
+SEA-weeds, API Reference. The API Reference is `autodoc` over `src/pyslice`
+with the heavy optional deps in `autodoc_mock_imports`, so **building the HTML
+*is* the API regeneration** — there is no stub step and no committed generated
+`.rst`. Run it before calling any documentation task done.
+
+`PYSLICE_DOCS_OFFLINE=1` drops the intersphinx mappings; without it `-W` fails
+on unreachable inventories, which no `suppress_warnings` subtype silences.
+Build output lands in `docs/_build/` and is gitignored — never commit it.
+
+Every substantive `sea-weeds/` feature page carries a **Provenance and
+verification** subsection linking source entry points, schemas, tests, guides,
+and AI-tool artifacts. `sea-weeds/resolution_layer.md` is the reference page
+for the seashell pattern; keep it in sync with `data/seashell.py`.
 
 ## Style rules
 
