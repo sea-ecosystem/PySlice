@@ -92,6 +92,7 @@ exactly periodic samples) or `pyslice_transform_trajectory` → simulation.
 Verify with `pyslice_describe_handle` and `pyslice_preview_potential`
 before running. The fetch records the database origin, and
 `pyslice_export_sea_file` later stores it under the Material entry's
-`Metadata.Database` in `SEAFile.Materials` — Materials entries follow
-sea-eco's atom-record format (a `SignalSet` with `positions`/`element`
-members; the component axis is categorical and role-unassigned).
+`Metadata.Database` in `SEAFile.Materials`. Materials entries conform to
+sea-eco's `signal-containers` schema, `atomic-structure` profile v1
+(`atoms`/`cell` SignalSets inside a marked `SignalCollection`); see
+`docs/conformance/signal-containers.md`.

@@ -110,12 +110,20 @@ subagents are the workers. The parameter physics lives ONCE, in
   `Metadata.Database`) and Sample (built structure, `Metadata.build`) in
   `Materials`, Sample's SEAID rooted at the Material's. Link provenance on
   the collection's own datasets — adding deep-copies and re-mints SEAIDs.
-- **Materials entries use sea-eco's atom-record format** (the
-  signal-quantities/SignalSet-slicing design): a `SignalSet` of typed
-  members sharing the `atom` dimension — `positions` (time, atom,
-  component) with `Signal.build_component_dimension(['x','y','z'], 'Å')`
-  as a **role-unassigned** categorical axis, `element` as a string member,
-  `velocities` when present. Never mark a component axis nav/det.
+- **Materials entries follow sea-eco's `signal-containers` schema**,
+  `atomic-structure` profile **v1** — a prescriptive contract, not a
+  convention. Read
+  `sea-eco/src/pySEA/ai_wiki/sea_eco/schema/signal-containers/intents.md`
+  (CONT-6) before touching it, and keep
+  `docs/conformance/signal-containers.md` in sync. Shape: a marked
+  `SignalCollection` with an `atoms` SignalSet (`position` float
+  `(*context, atom, coordinate)`, `element` string `(atom,)`,
+  `clamp_boundary_condition` bool `(atom,)`) and a `cell` SignalSet
+  (`cell` float `(*context, cell_vector, coordinate)`,
+  `periodic_boundary_condition` bool). `coordinate` is categorical x/y/z,
+  `cell_vector` is a/b/c, and **value units live on scalar
+  `SignalQuantities`, never on the component axes**. Build it through
+  `mark_atomic_structure` so it is validated on construction.
 - **Every frame is propagated** — frame count = frozen-phonon configs or MD
   snapshots.
 - **Blocking compute:** `MultisliceCalculator.run()` and MD `run()` block

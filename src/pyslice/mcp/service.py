@@ -2368,7 +2368,7 @@ class PySliceService:
         if params.material_handle:
             material = self._require_type(params.material_handle, Trajectory)
             material_name = params.material_name or "Material"
-            materials.append(self._trajectory_to_material_set(
+            materials.append(self._trajectory_to_atomic_structure(
                 material,
                 name=material_name,
                 kind="Material",
@@ -2376,7 +2376,7 @@ class PySliceService:
             ))
         if params.sample_handle:
             sample = self._require_type(params.sample_handle, Trajectory)
-            materials.append(self._trajectory_to_material_set(
+            materials.append(self._trajectory_to_atomic_structure(
                 sample,
                 name="Sample",
                 kind="Sample",
@@ -2459,7 +2459,7 @@ class PySliceService:
             signal_type="Image",
         )
 
-    def _trajectory_to_material_set(
+    def _trajectory_to_atomic_structure(
         self,
         trajectory: Any,
         name: str,
@@ -2467,25 +2467,34 @@ class PySliceService:
         source: Optional[Dict[str, Any]] = None,
         build: Optional[Dict[str, Any]] = None,
     ):
-        """Convert a trajectory to a SignalSet in the atom-record format.
+        """Convert a trajectory to a conforming ``atomic-structure`` collection.
 
-        Follows sea-eco's canonical atomic-structure layout (the
-        signal-quantities/SignalSet-slicing design): heterogeneous atom
-        records are a ``SignalSet`` of typed members sharing the ``atom``
-        dimension — a ``positions`` member ``(time, atom, component)`` whose
-        component axis is the categorical, role-unassigned
-        ``Signal.build_component_dimension(['x', 'y', 'z'], units='Å')``, an
-        ``element`` member of symbol strings, and a ``velocities`` member
-        when the trajectory carries any. The formula/box land in
+        Builds the sea-eco ``signal-containers`` schema's ``atomic-structure``
+        profile version 1: a :class:`SignalCollection` root holding an
+        ``atoms`` SignalSet (``position``, ``element``,
+        ``clamp_boundary_condition``, plus ``velocity`` when the trajectory
+        carries any) and a ``cell`` SignalSet (``cell``,
+        ``periodic_boundary_condition``). Coordinate and cell-vector axes are
+        categorical (``x``/``y``/``z`` and ``a``/``b``/``c``), value units live
+        on scalar ``SignalQuantities`` rather than on the component axes, and
+        the root is marked and validated via
+        :func:`pySEA.sea_eco.signal_containers.mark_atomic_structure`.
+
+        Single-frame structures use the profile's static form (no context
+        axis); multi-frame trajectories add a calibrated ``time`` context axis
+        to ``position``. The cell stays static because a PySlice
+        ``Trajectory`` carries one ``box_matrix`` for all frames.
+
+        PySlice provenance rides on the root's metadata: formula and counts in
         ``Metadata.Material``, database origin in ``Metadata.Database``, and
-        the build record under ``Metadata.build`` (the agreed Sample layout).
+        the build record in ``Metadata.build``.
 
         Parameters
         ----------
         trajectory : Trajectory
             Structure to convert.
         name : str
-            Set name (e.g. "Material", "Sample", or the formula).
+            Collection name (e.g. "Material", "Sample", or the formula).
         kind : str
             "Material" or "Sample" (recorded in metadata).
         source : dict | None, optional
@@ -2495,27 +2504,39 @@ class PySliceService:
 
         Returns
         -------
-        pySEA.sea_eco.architecture.base_structure.SignalSet
-            Atom-record set (`set['positions']`, `set['element']`, ...).
+        pySEA.sea_eco.architecture.base_structure.SignalCollection
+            Marked, validated atomic-structure collection.
 
         Raises
         ------
         ImportError
-            If sea-eco is not installed.
+            If sea-eco (or its ``signal_containers`` module) is unavailable.
+        ValueError
+            If the assembled collection fails profile validation.
 
         See Also
         --------
-        pySEA.sea_eco...Signal.build_component_dimension : Component axis.
-        pySEA.sea_eco...Signal.split_components_to_set : The set-form rule.
+        pySEA.sea_eco.signal_containers.validate_atomic_structure : The gate.
 
         Notes
         -----
-        The access grammar applies to the result: ``set['positions']``
-        selects a member, ``set(atom=(0, 10))`` slices calibrated ranges.
+        PySlice treats every cell as fully periodic (the multislice
+        propagator assumes it), so ``periodic_boundary_condition`` is all
+        True, and no atom is clamped, so ``clamp_boundary_condition`` is all
+        False.
         """
         from collections import Counter
 
-        from pySEA.sea_eco.architecture.base_structure import Dimension, Dimensions, Metadata, Signal, SignalSet
+        from pySEA.sea_eco.architecture.base_structure import (
+            Dimension,
+            Dimensions,
+            Metadata,
+            Signal,
+            SignalCollection,
+            SignalQuantities,
+            SignalSet,
+        )
+        from pySEA.sea_eco.signal_containers import mark_atomic_structure
 
         from ..io.build import atom_symbols
 
@@ -2523,51 +2544,70 @@ class PySliceService:
         counts = Counter(symbols)
         formula = "".join(f"{el}{n if n > 1 else ''}" for el, n in sorted(counts.items()))
         n_atoms = int(trajectory.n_atoms)
+        n_frames = int(trajectory.n_frames)
+        contextual = n_frames > 1
 
-        def _atom_dimension() -> Any:
-            """Return a fresh ``atom`` index dimension for one member."""
-            return Dimension(name="atom", size=n_atoms, scale=1.0, offset=0.0)
-
-        def _time_dimension() -> Any:
-            """Return a fresh calibrated ``time`` dimension for one member."""
-            return Dimension(
+        atom_axis = Dimension(name="atom", size=n_atoms, scale=1, offset=0)
+        coordinate = Dimension(name="coordinate", values=["x", "y", "z"])
+        positions = np.asarray(trajectory.positions, dtype=float)
+        position_axes = [atom_axis.deepcopy(), coordinate.deepcopy()]
+        if contextual:
+            position_axes.insert(0, Dimension(
                 name="time", space="temporal", units="ps",
-                values=np.arange(trajectory.n_frames) * (trajectory.timestep or 0.0),
-            )
-
-        members = [Signal(
-            data=np.asarray(trajectory.positions, dtype=np.float32),
-            name="positions",
-            dimensions=Dimensions(
-                [_time_dimension(), _atom_dimension(),
-                 Signal.build_component_dimension(["x", "y", "z"], units="Å")],
-                nav_dimensions=[0, 1],  # component axis stays role-unassigned
-            ),
-        ), Signal(
-            data=np.asarray(symbols),
-            name="element",
-            dimensions=Dimensions([_atom_dimension()], nav_dimensions=[0]),
-        )]
-        velocities = np.asarray(trajectory.velocities, dtype=np.float32)
-        if np.any(velocities):
-            members.append(Signal(
-                data=velocities,
-                name="velocities",
-                dimensions=Dimensions(
-                    [_time_dimension(), _atom_dimension(),
-                     Signal.build_component_dimension(["x", "y", "z"], units="Å/ps")],
-                    nav_dimensions=[0, 1],
-                ),
+                values=np.arange(n_frames) * float(trajectory.timestep or 0.0),
             ))
+        else:
+            positions = positions[0]
+        members = [
+            Signal(
+                positions,
+                name="position",
+                dimensions=Dimensions(position_axes),
+                signal_quantities=SignalQuantities([Dimension(name="position", units="Å")]),
+            ),
+            Signal(
+                np.asarray([str(symbol) for symbol in symbols]),
+                name="element",
+                dimensions=Dimensions([atom_axis.deepcopy()]),
+            ),
+            Signal(
+                np.zeros(n_atoms, dtype=bool),
+                name="clamp_boundary_condition",
+                dimensions=Dimensions([atom_axis.deepcopy()]),
+            ),
+        ]
+        velocities = np.asarray(trajectory.velocities, dtype=float)
+        if np.any(velocities):
+            velocity_axes = [axis.deepcopy() for axis in position_axes]
+            members.append(Signal(
+                velocities if contextual else velocities[0],
+                name="velocity",
+                dimensions=Dimensions(velocity_axes),
+                signal_quantities=SignalQuantities([Dimension(name="velocity", units="Å/ps")]),
+            ))
+
+        cell_vector = Dimension(name="cell_vector", values=["a", "b", "c"])
+        cell_members = [
+            Signal(
+                np.asarray(trajectory.box_matrix, dtype=float),
+                name="cell",
+                dimensions=Dimensions([cell_vector.deepcopy(), coordinate.deepcopy()]),
+                signal_quantities=SignalQuantities([Dimension(name="cell", units="Å")]),
+            ),
+            Signal(
+                np.ones(3, dtype=bool),
+                name="periodic_boundary_condition",
+                dimensions=Dimensions([cell_vector.deepcopy()]),
+            ),
+        ]
 
         metadata: Dict[str, Any] = {
             "Material": {
                 "kind": kind,
                 "formula": formula,
                 "elements": {element: int(n) for element, n in sorted(counts.items())},
-                "box_matrix_A": np.asarray(trajectory.box_matrix, dtype=float).tolist(),
                 "n_atoms": n_atoms,
-                "n_frames": int(trajectory.n_frames),
+                "n_frames": n_frames,
                 "timestep_ps": float(trajectory.timestep or 0.0),
             },
         }
@@ -2575,8 +2615,13 @@ class PySliceService:
             metadata["Database"] = dict(source)
         if build:
             metadata["build"] = dict(build)
-        return SignalSet(signals=members, name=name, metadata=Metadata(metadata))
 
+        structure = SignalCollection(
+            [SignalSet(members, name="atoms"), SignalSet(cell_members, name="cell")],
+            name=name,
+            metadata=Metadata(metadata),
+        )
+        return mark_atomic_structure(structure)
     def export_sea(self, handle: str, filename: str) -> Dict[str, Any]:
         """Export a simulation result to a ``.sea`` file.
 

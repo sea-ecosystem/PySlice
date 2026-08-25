@@ -2,7 +2,7 @@
 
 Verifies the agreed layout: simulation results in ``SEAFile.Simulations``,
 the unit cell as a *Material* entry and the built structure as a *Sample*
-entry in ``SEAFile.Materials``, the build record under
+entry in ``SEAFile.Materials`` (both in the ``atomic-structure`` profile v1), the build record under
 ``Sample.Metadata.build``, database info under ``Metadata.Database``, and
 the Sample's SEAID rooted at the Material's (the provenance relation) —
 all surviving a ``.sea`` round-trip through sea-eco's generic loader.
@@ -88,22 +88,37 @@ def test_sea_file_round_trip_materials_and_provenance(packaged):
     operations = [json.loads(str(op)) for op in build.operations]
     assert operations[-1]["op"] == "frozen_phonon"
 
-    # Atom-record format (sea-eco SignalSet layout): typed members sharing
-    # the atom dimension, positions with a categorical component axis.
-    assert type(sample).__name__ == "SignalSet"
-    member_names = sample.get_dataset_names()
-    assert member_names[:2] == ["positions", "element"]
-    positions = sample["positions"]
-    assert positions.data.shape[0] == 2  # frozen-phonon frames
-    assert positions.data.shape[2] == 3
-    component = positions._local_dimensions.dimensions[2]
-    assert [str(v) for v in component.values] == ["x", "y", "z"]
-    # component axis is structural: role-unassigned (neither nav nor det)
-    assert 2 not in positions._local_dimensions.nav_dimensions
-    assert 2 not in positions._local_dimensions.det_dimensions
-    elements = sample["element"]
+    # atomic-structure profile v1 (sea-eco `signal-containers` schema):
+    # a marked SignalCollection with `atoms` and `cell` SignalSets.
+    from pySEA.sea_eco.signal_containers import validate_atomic_structure
+
+    validate_atomic_structure(sample)
+    assert sample.schema_id == "signal-containers"
+    assert sample.schema_profile == "atomic-structure"
+    assert sample.schema_version == 1
+    assert sample.get_dataset_names() == ["atoms", "cell"]
+
+    position = sample["atoms"]["position"]
+    # multi-frame -> contextual form: (time, atom, coordinate)
+    assert position.dimensions.get_names() == ["time", "atom", "coordinate"]
+    assert position.data.shape == (2, position.data.shape[1], 3)
+    # units live on the scalar quantity, not the coordinate axis
+    assert position.signal_quantities.dimensions[0].units == "Å"
+    assert position.dimensions["coordinate"].units in ("", None)
+    # categorical selection works per CONT-2
+    assert position(coordinate="x").name == "x"
+
+    elements = sample["atoms"]["element"]
+    assert elements.dimensions.get_names() == ["atom"]
     assert set(str(e) for e in elements.data) == {"C"}
-    assert len(elements.data) == positions.data.shape[1]
+    assert sample["atoms"]["clamp_boundary_condition"].data.dtype == bool
+    # CONT-1: a member view exposes the exact registry axis object
+    assert elements.dimensions["atom"] is sample["atoms"].dimensions["atom"]
+
+    cell = sample["cell"]["cell"]
+    assert cell.dimensions.get_names() == ["cell_vector", "coordinate"]
+    assert [str(v) for v in cell.dimensions["cell_vector"].values] == ["a", "b", "c"]
+    assert sample["cell"]["periodic_boundary_condition"].data.all()
 
 
 def test_simulation_signal_is_plain_and_calibrated(packaged):
@@ -142,9 +157,11 @@ def test_database_source_flows_into_material_metadata(service, tmp_path, monkeyp
         ),
     )
     fetched = service.fetch_structure("cod", "12345", None, True, None, None)
-    signal = service._trajectory_to_material_set(
+    structure = service._trajectory_to_atomic_structure(
         service._get(fetched["handle"]), name="Material", kind="Material",
         source=service._source_info[fetched["handle"]],
     )
-    assert signal.metadata.Database.provider == "cod"
-    assert signal.metadata.Database.entry_id == "12345"
+    assert structure.metadata.Database.provider == "cod"
+    assert structure.metadata.Database.entry_id == "12345"
+    # single-frame -> static profile form (no context axis)
+    assert structure["atoms"]["position"].dimensions.get_names() == ["atom", "coordinate"]
