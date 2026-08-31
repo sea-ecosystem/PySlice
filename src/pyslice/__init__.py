@@ -12,6 +12,7 @@ except Exception:
     __version__ = "dev"
 
 from .io.loader import *
+from .io.databases import DatabaseError, search_structures, fetch_cif, load_structure_from_database
 from .backend import Backend, NumpyBackend, TORCH_AVAILABLE, make_backend, to_cpu, to_numpy
 from .md.molecular_dynamics import *
 from .multislice.calculators import *
