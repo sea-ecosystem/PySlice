@@ -68,6 +68,16 @@ PY
 `fast` may select Torch CPU when no accelerator is available. Override with
 `PYSLICE_BACKEND=numpy` or `PYSLICE_DEVICE=cpu|cuda|mps`.
 
+`PYSLICE_PRECISION=single|double` selects the arithmetic precision of the
+torch backend. The default is `double` on every device except MPS, which
+cannot do float64. `single` is several times faster on consumer and
+workstation GPUs, where the double-precision rate is a small fraction of
+single; check it against `double` on your own system before relying on it.
+
+Slice cache files are keyed on the precision, so a populated `cache_dir`
+written by an earlier version is not reused and is recomputed once on
+upgrade. The stale files are harmless but are not removed automatically.
+
 ## Troubleshooting
 
 - If `import pyslice` fails while working from a checkout, activate the same

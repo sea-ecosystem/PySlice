@@ -470,10 +470,23 @@ class Potential:
         return lo, hi
 
     def _cache_path(self, slice_idx: int) -> Optional[Path]:
+        """Where slice ``slice_idx`` is cached, or None if caching is off.
+
+        The dtype is part of the name. Precision became selectable, so the
+        same ``cache_dir`` can now be visited by a single-precision run and a
+        double-precision one; without this the second silently reads the
+        first's float32 slices back and reports them as double.
+        """
         if self._cache_dir is None:
             return None
+        # NumpyBackend.float_dtype is a type, whose str() is
+        # "<class 'numpy.float64'>" -- reserved characters on Windows and
+        # unglobbable everywhere. __name__ covers the numpy types; torch
+        # dtypes have no __name__ and fall through to the str() form.
+        raw = getattr(self._backend, "float_dtype", "")
+        dtype = getattr(raw, "__name__", None) or str(raw).replace("torch.", "")
         return (self._cache_dir /
-                f"potential_{self._frame_idx}_{slice_idx}.npy")
+                f"potential_{self._frame_idx}_{slice_idx}_{dtype}.npy")
 
     # ------------------------------------------------------------------
     # Public API
