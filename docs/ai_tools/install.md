@@ -79,5 +79,6 @@ intended first call in any zero-context session.
 | `PYSLICE_MCP_WORKSPACE` | Default artifact workspace |
 | `PYSLICE_MP_API_KEY` / `MP_API_KEY` | Materials Project key (COD needs none) |
 | `PYSLICE_DEVICE` | Force a compute device |
+| `PYSLICE_PRECISION` | `single` or `double` arithmetic (default `double`, MPS always `single`) |
 | `PYSLICE_BACKEND=numpy` | Force the numpy backend |
 | `PYSLICE_DB_LIVE_TESTS=1` | Enable the live COD round-trip test |

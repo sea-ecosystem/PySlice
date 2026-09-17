@@ -69,7 +69,9 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
 - `src/pyslice/data/pyslice_serial.py` — `PySliceSerial` HDF5 mixin; gets its
   sea-eco names from `seashell`, never from `pySEA` directly.
 - `src/pyslice/backend.py` — numpy/torch backend seam (`make_backend`,
-  `PYSLICE_DEVICE`, `PYSLICE_BACKEND=numpy`).
+  `PYSLICE_DEVICE`, `PYSLICE_BACKEND=numpy`, `PYSLICE_PRECISION=single|double`).
+  Precision defaults to double; `single` is a deliberate opt-in and the
+  slice cache is keyed on dtype so the two cannot cross-contaminate.
 - `src/pyslice/mcp/{service,server}.py` — MCP surface (`python -m pyslice.mcp`).
 - `skills/` — agent skills; `.claude/agents/` — subagents; `tests/` —
   numbered pytest files; `examples/` — runnable technique scripts.
