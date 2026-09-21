@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 from ..multislice.multislice import Probe, aberrationFunction
-from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata, simulation_seaid
 from pyslice.backend import Backend, to_numpy
 
 
@@ -96,7 +96,11 @@ class WFData(PySliceSerial, Signal):
 
         # Store array AFTER super().__init__ to avoid being overwritten
         self._array = array
-        super().__init__(data=array, dimensions=dimensions, metadata=metadata)
+        init_kwargs = dict(data=array, dimensions=dimensions, metadata=metadata)
+        provenance = simulation_seaid()
+        if provenance is not None:
+            init_kwargs['Provenance'] = provenance
+        super().__init__(**init_kwargs)
         self.metadata = metadata
 
     @property

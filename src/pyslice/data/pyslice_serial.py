@@ -22,6 +22,35 @@ except Exception:
             raise ImportError("pySEA is required for .to_sea() serialization")
     Dimensions,Dimension,Metadata = None,None,None
 
+
+def simulation_seaid(clsid: str = "SS101") -> "str | None":
+    """
+    Mint a simulation-class SEA ID for a PySlice output container.
+
+    Every PySlice output is simulated, so it carries sea-sand's simulation
+    container CLSIDs (``SS1`` Signal, ``SSC`` SignalCollection, ``SSS``
+    SignalSet, serial ``01``). The organization is resolved from sea-sand's
+    identity preferences.
+
+    Parameters
+    ----------
+    clsid : str, optional
+        Registered container CLSID, by default ``"SS101"`` (a Signal).
+
+    Returns
+    -------
+    str or None
+        Canonical hyphenated SEA ID, or ``None`` when sea-sand is not
+        importable (a warning is issued and the container keeps sea-eco's
+        default id).
+    """
+    try:
+        from pySEA.sea_sand import generate_sea_id
+    except Exception:
+        warn("pySEA.sea_sand is not installed. Simulation outputs keep the default SEA ID.")
+        return None
+    return generate_sea_id(clsid=clsid)
+
 def _to_numpy(x):
     """Convert tensor or array-like to numpy array."""
     if x is None:

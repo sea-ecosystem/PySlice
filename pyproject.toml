@@ -20,6 +20,7 @@ dependencies = [
 fast = ["torch","torchvision"]
 test = []
 md = ["orb-models>=0.6.0; python_version < '3.13'"]
+sea = ["sea-eco", "sea-sand"]
 
 [project.urls]
 Homepage = "https://github.com/h-walk/PySlice"
@@ -32,6 +33,10 @@ include = [
     "src/pyslice/data/*.txt",
     "src/pyslice/data/*.json",
 ]
+
+[tool.uv.sources]
+sea-eco = { path = "../sea-eco", editable = true }
+sea-sand = { path = "../sea-sand", editable = true }
 
 [build-system]
 requires = ["hatchling"]

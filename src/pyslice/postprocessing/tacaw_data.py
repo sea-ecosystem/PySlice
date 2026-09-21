@@ -12,7 +12,7 @@ import numpy as np
 from tqdm import tqdm
 
 from .wf_data import WFData
-from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata, simulation_seaid
 from pyslice.backend import Backend, to_numpy
 
 logger = logging.getLogger(__name__)
@@ -112,6 +112,9 @@ class TACAWData(PySliceSerial, Signal):
                 },
             })
             self.sea_type = "Signal"
+            provenance = simulation_seaid()
+            if provenance is not None:
+                self.Provenance = provenance
 
     # ------------------------------------------------------------------
     # Properties

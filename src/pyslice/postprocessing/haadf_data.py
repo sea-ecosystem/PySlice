@@ -6,7 +6,7 @@ from typing import Optional, Tuple, Dict, Any, List, Union
 from pathlib import Path
 import logging
 from .wf_data import WFData
-from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata
+from ..data.pyslice_serial import PySliceSerial, Signal, Dimensions, Dimension, Metadata, simulation_seaid
 from pyslice.backend import Backend, to_numpy
 
 logger = logging.getLogger(__name__)
@@ -80,6 +80,9 @@ class HAADFData(PySliceSerial, Signal):
             }
             self.metadata = Metadata(metadata_dict)
             self.sea_type="Signal"
+            provenance = simulation_seaid()
+            if provenance is not None:
+                self.Provenance = provenance
 
     @property
     def data(self):
