@@ -40,6 +40,7 @@ try:  # the one and only sea-eco import in PySlice
         SignalQuantities,
         SignalSet,
         safe_decode,
+        seaid_of,
     )
     from pySEA.sea_eco.signal_containers import (  # noqa: F401
         mark_atomic_structure,
@@ -108,6 +109,26 @@ except Exception as exc:  # pragma: no cover - exercised only without sea-eco
     SignalSet = SignalCollection = SEAFile = None  # type: ignore[assignment]
     Dimension = Dimensions = Metadata = SignalQuantities = SEAID = None  # type: ignore[assignment]
     safe_decode = None  # type: ignore[assignment]
+
+    def seaid_of(value: Any) -> str:  # type: ignore[no-redef]
+        """Return ``value``'s SEA ID string without sea-eco.
+
+        Parameters
+        ----------
+        value : Any
+            ``None``, a string, or an object with a ``Provenance``.
+
+        Returns
+        -------
+        str
+            ``""`` for ``None``; the string itself; else ``str(Provenance)``.
+        """
+        if value is None:
+            return ""
+        if isinstance(value, str):
+            return value
+        return str(getattr(value, "Provenance", value))
+
     mark_atomic_structure = validate_atomic_structure = None  # type: ignore[assignment]
 
 SEASerializable = _SEASerializable

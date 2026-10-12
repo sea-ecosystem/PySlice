@@ -69,6 +69,7 @@ def packaged(service, tmp_path, monkeypatch):
 
 def test_sea_file_round_trip_materials_and_provenance(packaged):
     service, run, exported = packaged
+    from pySEA.sea_eco.architecture import root_id_of, seaid_of
     from pySEA.sea_eco.io import load as sea_load
 
     sea_file = sea_load(exported["sea_path"])
@@ -79,8 +80,8 @@ def test_sea_file_round_trip_materials_and_provenance(packaged):
     material = sea_file.Materials.datasets[0]
     sample = sea_file.Materials.datasets[1]
     # provenance relation: Sample roots at the Material
-    assert _norm_id(sample.Provenance.root) == _norm_id(material.Provenance)
-    assert _norm_id(exported["material_seaid"]) == _norm_id(material.Provenance)
+    assert _norm_id(root_id_of(sample)) == _norm_id(seaid_of(material))
+    assert _norm_id(exported["material_seaid"]) == _norm_id(seaid_of(material))
 
     # Material metadata: formula + box; Sample metadata: build record
     assert material.metadata.Material.formula == "C2"
