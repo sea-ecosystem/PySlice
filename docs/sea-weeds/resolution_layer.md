@@ -32,10 +32,12 @@ result types rather than one.
    sea-eco present ──→ re-export real Signal / SignalSet /
                        SignalCollection / Dimensions / Metadata /
                        SignalQuantities / SEAID / SEAFile /
-                       mark_atomic_structure / validate_atomic_structure
+                       mark_atomic_structure / validate_atomic_structure /
+                       seaid_of
                        resolve()   register_resolver()   adopt_signal_state()
                           │
    sea-eco absent ───→ dummy SEASerializable + dummy Signal *class*
+                       seaid_of() stand-in (str of the Provenance)
                        resolve() raises with the install command
                           │
                           ▼

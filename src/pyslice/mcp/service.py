@@ -2408,7 +2408,7 @@ class PySliceService:
         ImportError
             If sea-eco is not installed.
         """
-        from ..data.seashell import SEAFile, SEAID, Signal, require_sea
+        from ..data.seashell import SEAFile, Signal, require_sea, seaid_of
 
         require_sea("Exporting a SEAFile")
 
@@ -2460,11 +2460,13 @@ class PySliceService:
             stored_material = next((d for d in stored if d.name == material_name), None)
             stored_sample = next((d for d in stored if d.name == "Sample"), None)
             if stored_material is not None:
-                payload["material_seaid"] = str(stored_material.Provenance)
+                payload["material_seaid"] = seaid_of(stored_material)
             if stored_sample is not None:
                 if stored_material is not None:
-                    stored_sample.Provenance = SEAID(root=str(stored_material.Provenance))
-                payload["sample_seaid"] = str(stored_sample.Provenance)
+                    # The Sample is rooted at its Material (sea-eco
+                    # Provenance.Relations.root_id); it keeps its own SEAID.
+                    stored_sample.Provenance.Relations.root_id = seaid_of(stored_material)
+                payload["sample_seaid"] = seaid_of(stored_sample)
         target = self._workspace_path(params.filename if params.filename.endswith(".sea") else f"{params.filename}.sea")
         sea_file.to_sea(str(target))
         payload.update({

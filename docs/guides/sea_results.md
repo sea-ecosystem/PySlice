@@ -37,7 +37,7 @@ from pySEA.sea_eco.architecture.base_structure import Signal
 isinstance(wave, Signal)        # True
 wave.name                       # 'Wavefunction'
 wave.dimension_signature        # ['probe', 'time', 'kx', 'ky', 'layer']
-wave.Provenance                 # a SEAID, minted at construction
+wave.Provenance.Self.seaid      # its SEAID, minted at construction
 wave.Analysis                   # an AnalysisCollection, ready for lineage
 ```
 
