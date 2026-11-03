@@ -86,6 +86,14 @@ trajectory is a different object and resolves on its own, so a cache can never
 go stale. That property is the whole of the implicitness: no conversion call
 appears in user code.
 
+### `sea_databases` — the database backend
+
+`sea_databases()` returns `pySEA.sea_eco.databases`, which
+`io/databases.py` uses for every structure search and fetch. It is an
+accessor rather than a top-level import because retrieval is the only path
+that needs it, and because a sea-eco older than its database importers should
+fail with an "update sea-eco" message, not break PySlice's import.
+
 ## Design decisions, and what they cost
 
 **Trajectory resolves; it does not inherit.** `Trajectory` could have *been* a
@@ -166,6 +174,7 @@ Never import it elsewhere.
 |---|---|---|
 | sea-eco absent | `ImportError` from `resolve`/`.sea`, warning from `to_sea` | `require_sea`, dummy classes |
 | sea-eco renames or moves a name | One `ImportError` at the layer, not four scattered ones | Single import site + `tests/32` scan |
+| sea-eco without `databases` (older than 2026-11-03) | `ImportError` asking to update sea-eco, only when retrieving | `sea_databases` |
 | A sea-eco name is bound to `None` that PySlice subclasses | `TypeError: metaclass conflict` at import | Dummy `Signal` class; no-sea path is tested |
 | Resolver registered only as an import side effect | Silent `TypeError` if the module was already imported | Explicit registration in `_ensure_builtin_resolvers` |
 | Result constructor skips `adopt_signal_state` | `AttributeError` from ordinary Signal methods | `tests/32` asserts name, Provenance, Analysis, signature per class |
@@ -198,7 +207,7 @@ is what makes that class of failure loud.
 | Serialization bridge | `src/pyslice/data/pyslice_serial.py` (imports names from the layer) |
 | Pattern precedent | `sea-ecosystem/rayTEM_original: src/pySEA/rayTEM/seashells.py` and its wiki page; `sea-eco/examples/example_3rd_party/basic_example.md` |
 | Contract implemented | sea-eco `signal-containers` schema — see {doc}`signal_containers` and `docs/conformance/signal-containers.md` |
-| Focused tests | `tests/32_seashell_resolution.py` (both paths, idempotence, caching, self-registration, single-coupling-point scan); `tests/31_sea_file_export.py` (SEAFile packaging, schema validation on reload) |
+| Focused tests | `tests/32_seashell_resolution.py` (both paths, idempotence, caching, self-registration, single-coupling-point scan); `tests/31_sea_file_export.py` (SEAFile packaging, schema validation on reload); `tests/28_databases.py` (retrieval through `sea_databases`) |
 | User guide | {doc}`../guides/sea_results` |
 | AI-tool artifacts | `pyslice_export_sea_file` and `pyslice_render_signal` in `src/pyslice/mcp/server.py`; `skills/structure-retrieval/SKILL.md` |
 | API reference | {doc}`../api_reference` — `pyslice.data.seashell`, `pyslice.data.atomic_structure` |
