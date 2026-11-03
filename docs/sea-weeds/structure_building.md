@@ -2,7 +2,8 @@
 
 **What exists:** `src/pyslice/io/build.py` — `build_slab` for exactly periodic
 beam-oriented slabs, plus the reciprocal-lattice helpers the parameter rules
-depend on. `src/pyslice/io/databases.py` — Materials Project and COD clients.
+depend on. `src/pyslice/io/databases.py` — structure retrieval, delegated to
+sea-eco's database importers.
 
 **Why:** a multislice run is periodic in the plane. A sample whose lateral
 edges are not crystallographically periodic scatters off those cut edges, and
@@ -62,14 +63,22 @@ derivations.
 
 ## Databases
 
-`io/databases.py` uses the standard library only — no `requests`, no
-`pymatgen`. Materials Project structures arrive as pymatgen `Structure` JSON
-and are rendered as **P1 CIFs** (all sites explicit) so ASE can read them
-without a pymatgen dependency; no symmetry is lost for simulation purposes.
-COD CIFs are served verbatim.
+`io/databases.py` holds no client. Since 2026-11-03 every search and fetch
+goes to sea-eco's `pySEA.sea_eco.databases`, the one database backend the
+ecosystem shares with sea-sculptor and Poseidon. It is reached only through
+`seashell.sea_databases()`, so `data/seashell.py` stays PySlice's single
+sea-eco import site, and retrieval is a `[sea]` feature: without sea-eco it
+raises the usual install-hint `ImportError`. sea-eco serves MP, COD and the
+OPTIMADE providers, owns key lookup and caching, and returns each entry as an
+`atomic-structure` collection. PySlice turns that into a **P1 CIF** (all
+sites explicit, converted from the structure's stored length units) for
+`Loader`; COD CIFs are copied verbatim from sea-eco's cache. The public
+functions, their `provider`/`spacegroup` result keys and PySlice's
+`DatabaseError` are unchanged; sea-eco's error is re-raised as it, with the
+original as `__cause__`.
 
-Errors are actionable by contract: a missing MP key names both environment
-variables and the signup URL; a network failure names the unreachable host.
+Errors are actionable by contract: a missing MP key names the signup URL and
+where to put the key; a network failure names the unreachable host.
 
 **Boundary:** these clients fetch and parse. They do not judge whether a
 structure is physical — partial occupancies (common in COD refinements) load
@@ -82,8 +91,10 @@ through ASE but are not simulable, and that is the caller's problem to notice.
 | No small orthogonal periodic cell exists | `ValueError` naming `max_index` and the carve fallback | `orthogonal_supercell_matrix` search bound |
 | Cell not diagonal after orthogonalization | `ValueError` showing the cell | Explicit assertion before returning |
 | LAMMPS integer atom types reach `to_ase()` | `ValueError` naming `atom_mapping` | `atom_symbols` normalization |
-| MP key absent | `DatabaseError` naming both env vars and the signup URL | `_resolve_mp_api_key` |
-| COD id not numeric | `DatabaseError` | id check in `fetch_cif` |
+| MP key absent | `DatabaseError` naming the signup URL and key locations | sea-eco `MaterialsProject` |
+| COD id not numeric | `DatabaseError` | sea-eco COD client |
+| sea-eco missing or too old | `ImportError` naming `pyslice[sea]` | `seashell.sea_databases` |
+| Entry not periodic in 3-D | `DatabaseError` (cannot be a CIF) | `_atomic_structure_to_cif` |
 
 ## Limitations
 
@@ -98,7 +109,7 @@ through ASE but are not simulable, and that is the caller's problem to notice.
 | Aspect | Where |
 |---|---|
 | Implementation | `src/pyslice/io/build.py`, `src/pyslice/io/databases.py` |
-| Focused tests | `tests/29_slab_builder.py` (density, orthogonalization, thickness rounding, vacuum, diagonal box, negative case); `tests/28_databases.py` (mocked MP/COD, URL construction, P1 CIF loadability, env-gated live COD) |
+| Focused tests | `tests/29_slab_builder.py` (density, orthogonalization, thickness rounding, vacuum, diagonal box, negative case); `tests/28_databases.py` (sea-eco HTTP stubbed: MP/COD/OPTIMADE, key precedence, P1 CIF loadability, 3-D cell refusal, env-gated live COD) |
 | Parameter rules that consume it | `skills/simulation-parameter-selection/SKILL.md` rules 11–12 |
 | User guide | {doc}`../guides/structures` |
 | AI-tool artifacts | `pyslice_build_slab`, `pyslice_search_structures`, `pyslice_fetch_structure` in `src/pyslice/mcp/server.py`; `skills/structure-retrieval/SKILL.md` |

@@ -32,8 +32,8 @@ Permitted by the profile ("optional typed atom properties are allowed"):
 
 Provenance rides on the root collection's `Metadata` and is not part of the
 profile: `Metadata.Material` (kind, formula, element counts, atom/frame
-counts), `Metadata.Database` (provider, entry id, CIF path) on entries fetched
-from Materials Project or COD, and `Metadata.build` (the `build_slab` /
+counts), `Metadata.Database` (database title, provider, entry id, CIF path) on
+entries fetched from a structure database through sea-eco, and `Metadata.build` (the `build_slab` /
 transform record, operations JSON-encoded because `Metadata` does not persist
 lists of dicts).
 

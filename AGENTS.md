@@ -43,8 +43,10 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
 
 - `src/pyslice/io/loader.py` — `Loader`: CIF (via ASE), XYZ/LAMMPS/traj (via
   OVITO), in-memory ASE `Atoms`; caches `.npy` siblings next to sources.
-- `src/pyslice/io/databases.py` — Materials Project + COD search →
-  CIF retrieval (stdlib urllib only; MP key via `PYSLICE_MP_API_KEY`).
+- `src/pyslice/io/databases.py` — structure search → CIF retrieval
+  (Materials Project, COD, OPTIMADE providers) through sea-eco's
+  `pySEA.sea_eco.databases`, reached only via `seashell.sea_databases()`;
+  needs `pyslice[sea]`. No client of its own.
 - `src/pyslice/io/build.py` — ASE-backed `build_slab` (exactly periodic
   zone-axis slabs, orthogonalized cells, vacuum), `first_bragg_g`,
   `atom_symbols`/`trajectory_to_ase` (canonical str/int normalization).
@@ -89,7 +91,7 @@ Loader → Trajectory → (optional MD: ORBMDCalculator/FAIRChemMDCalculator)
 - **Skills:** `skills/pyslice` (umbrella), `multislice-imaging`,
   `tacaw-phonons`, `md-setup`, `simulation-parameter-selection` (the
   parameter physics — single source of truth), `structure-retrieval`
-  (Materials Project / COD → CIF).
+  (database → CIF through sea-eco).
 - **Subagents:** `.claude/agents/` — `multislice-parameter-advisor`,
   `simulation-runner`, `structure-builder`, `experiment-matcher`,
   `tacaw-analyst`, plus dev-time `pyslice-integration-reviewer` and
@@ -174,8 +176,8 @@ python -m pytest -q tests/test_*.py tests/04_adf_calculator.py tests/18_cache_ou
 The numbered regression files must be named explicitly for pytest discovery.
 Some other numbered files are standalone simulations requiring datasets, not
 unit tests; do not collect them indiscriminately. In the listed suites, `tests/27_mcp_service.py` and `tests/28_databases.py` run
-CPU-only with mocked HTTP (set `PYSLICE_DB_LIVE_TESTS=1` for the live COD
-round-trip). `tests/30_plan_simulation.py` encodes the reference prompted-
+CPU-only with sea-eco's HTTP seam stubbed (`tests/28` skips without sea-eco;
+set `PYSLICE_DB_LIVE_TESTS=1` for the live COD round-trip). `tests/30_plan_simulation.py` encodes the reference prompted-
 simulation requests (40 nm [110] diamond 4D-STEM with 10 nm slices;
 graphene dispersion to ±2g) as planning tests — extend it when adding
 intake rules. `tests/16_sea_eco_integration.py` is stale (imports names

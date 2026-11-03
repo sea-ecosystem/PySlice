@@ -1,6 +1,6 @@
 ---
 name: pyslice
-description: Use when simulating electron microscopy with the PySlice Python package — multislice TEM/STEM/4D-STEM imaging, diffraction, HAADF, or TACAW vibrational-EELS/phonon spectroscopy from MD trajectories. Routes structure loading (CIF/XYZ/LAMMPS, Materials Project/COD retrieval), supercell building, MD with ML potentials, multislice execution, post-processing, and .sea export to the right PySlice APIs and pyslice_* MCP tools.
+description: Use when simulating electron microscopy with the PySlice Python package — multislice TEM/STEM/4D-STEM imaging, diffraction, HAADF, or TACAW vibrational-EELS/phonon spectroscopy from MD trajectories. Routes structure loading (CIF/XYZ/LAMMPS, database retrieval through sea-eco), supercell building, MD with ML potentials, multislice execution, post-processing, and .sea export to the right PySlice APIs and pyslice_* MCP tools.
 ---
 
 # PySlice
@@ -26,7 +26,7 @@ Sub-skills (prefer the specific one when the task matches):
 - `md-setup` — ML-potential molecular dynamics for thermal trajectories
 - `simulation-parameter-selection` — the parameter physics (sampling, slices,
   tiling, probes, frames); the single source of truth other skills reference
-- `structure-retrieval` — Materials Project / COD search → CIF → Trajectory
+- `structure-retrieval` — database search (MP, COD, OPTIMADE, via sea-eco) → CIF → Trajectory
 
 ## Core Rules
 

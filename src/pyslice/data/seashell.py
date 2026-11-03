@@ -188,6 +188,40 @@ def require_sea(feature: str = "this feature") -> None:
     raise ImportError(f"{feature} requires sea-eco. {INSTALL_HINT}{detail}")
 
 
+def sea_databases() -> Any:
+    """Return sea-eco's database importers, the backend of structure retrieval.
+
+    PySlice keeps no database client of its own: :mod:`pyslice.io.databases`
+    searches and fetches through ``pySEA.sea_eco.databases``, reached only
+    through this accessor so this module stays PySlice's one sea-eco import
+    site.
+
+    Returns
+    -------
+    module
+        ``pySEA.sea_eco.databases``.
+
+    Raises
+    ------
+    ImportError
+        If sea-eco is missing, or too old to have ``databases``; the message
+        names the install command.
+
+    See Also
+    --------
+    require_sea : The generic missing-sea-eco error.
+    """
+    require_sea("Searching and fetching database structures")
+    try:
+        from pySEA.sea_eco import databases
+    except ImportError as exc:
+        raise ImportError(
+            "This sea-eco has no pySEA.sea_eco.databases; update sea-eco "
+            f"(its database importers landed on dev 2026-11-03). {INSTALL_HINT}"
+        ) from exc
+    return databases
+
+
 def register_resolver(type_name: str, resolver: Callable[..., Any]) -> None:
     """Register how one PySlice type resolves to a sea-eco container.
 

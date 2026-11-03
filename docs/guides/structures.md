@@ -22,8 +22,11 @@ Loaded arrays are cached as `.npy` siblings of the source file.
 
 ## From a database
 
-Search the Materials Project (computed, DFT-relaxed) or the Crystallography
-Open Database (experimental, published), then fetch a CIF:
+Search the Materials Project (computed, DFT-relaxed), the Crystallography
+Open Database (experimental, published) or an OPTIMADE provider (`oqmd`,
+`nomad`, `jarvis`, `alexandria`; computed), then fetch a CIF. The requests go
+through sea-eco's database importers, so install `pip install 'pyslice[sea]'`
+first:
 
 ```python
 from pyslice.io.databases import search_structures, load_structure_from_database
@@ -35,10 +38,13 @@ entries = search_structures("mp", formula="SiC")                     # needs an 
 ```
 
 Materials Project needs a free key from
-<https://next-gen.materialsproject.org/api>, read from `PYSLICE_MP_API_KEY` or
-`MP_API_KEY`. COD needs none — prefer it when you have no key. MP results are
+<https://next-gen.materialsproject.org/api>: pass `api_key=`, set `MP_API_KEY`
+(or `PYSLICE_MP_API_KEY`), or store it once with sea-eco's
+`SeaEcoSecrets.set_api_token("materials_project", key)`. COD and the OPTIMADE
+providers need none; prefer them when you have no key. MP results are
 sorted most-stable-first by `energy_above_hull_eV`; a hull value near zero is
-the ground-state phase.
+the ground-state phase. sea-eco caches every fetched entry, so a second fetch
+of the same id works offline.
 
 Watch for **partial occupancies**, common in COD refinements: they load through
 ASE but are not physical for a multislice run. Pick an ordered entry, or build

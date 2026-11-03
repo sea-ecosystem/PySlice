@@ -147,11 +147,14 @@ def test_render_signal_uses_sea_eco(packaged):
 
 
 def test_database_source_flows_into_material_metadata(service, tmp_path, monkeypatch):
-    import pyslice.io.databases as databases
+    import io
 
+    from pySEA.sea_eco.databases import _base, _http
+
+    monkeypatch.setattr(_base, "default_cache_directory", lambda: tmp_path / "sea-cache")
     monkeypatch.setattr(
-        databases, "_http_get",
-        lambda url, headers=None, timeout=30.0: (
+        _http, "_open",
+        lambda request, timeout: io.BytesIO(
             b"data_test\n_symmetry_space_group_name_H-M 'P 1'\n"
             b"_cell_length_a 3.0\n_cell_length_b 3.0\n_cell_length_c 3.0\n"
             b"_cell_angle_alpha 90\n_cell_angle_beta 90\n_cell_angle_gamma 90\n"
@@ -166,6 +169,7 @@ def test_database_source_flows_into_material_metadata(service, tmp_path, monkeyp
         source=service._source_info[fetched["handle"]],
     )
     assert structure.metadata.Database.provider == "cod"
+    assert structure.metadata.Database.database == "Crystallography Open Database"
     assert structure.metadata.Database.entry_id == "12345"
     # single-frame -> static profile form (no context axis)
     assert structure["atoms"]["position"].dimensions.get_names() == ["atom", "coordinate"]

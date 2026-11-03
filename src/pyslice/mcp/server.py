@@ -106,8 +106,9 @@ def build_server(
             "diffraction, and TACAW vibrational-EELS from MD) and exposes them through MCP. "
             "Call `pyslice_get_conventions` first in zero-context sessions — it documents units "
             "(Angstroms, mrad, eV, ps/fs, THz), the canonical workflow, and PySlice's gotchas. "
-            "Structures come from local files (`pyslice_load_structure`) or from the Materials "
-            "Project / COD (`pyslice_search_structures` + `pyslice_fetch_structure`). Most tools "
+            "Structures come from local files (`pyslice_load_structure`) or from structure "
+            "databases (Materials Project, COD, OPTIMADE providers, through sea-eco) via "
+            "`pyslice_search_structures` + `pyslice_fetch_structure`. Most tools "
             "return handles referring to live objects in the session registry; persist results "
             "with `pyslice_export_sea`. Use `pyslice_suggest_parameters` before setting up a "
             "simulation — it encodes the sampling/slice/probe/frame physics."
@@ -140,7 +141,7 @@ def build_server(
 
     @mcp.tool(name="pyslice_search_structures", annotations=_tool_annotations(True, open_world=True))
     async def pyslice_search_structures(params: SearchStructuresInput) -> str:
-        """Search Materials Project ('mp', API key) or COD ('cod', keyless) for crystal structures by formula/elements."""
+        """Search a crystal-structure database by formula/elements: 'mp' (Materials Project, API key), 'cod' (COD), or the OPTIMADE providers 'oqmd', 'nomad', 'jarvis', 'alexandria' (keyless). Served by sea-eco's database importers."""
 
         payload = service.search_structures(
             params.provider, params.formula, params.elements, params.limit, params.api_key
