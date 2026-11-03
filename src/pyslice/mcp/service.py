@@ -159,8 +159,8 @@ class SearchStructuresInput(StrictModel):
 
     Attributes
     ----------
-    provider : {"mp", "cod"}
-        Database to query (Materials Project or COD).
+    provider : {"mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"}
+        Database to query, through sea-eco's database importers.
     formula : str | None
         Chemical formula filter, e.g. ``"SiO2"``.
     elements : list[str] | None
@@ -173,7 +173,7 @@ class SearchStructuresInput(StrictModel):
         Output format for the response.
     """
 
-    provider: Literal["mp", "cod"] = Field(..., description="'mp' = Materials Project (API key), 'cod' = Crystallography Open Database (keyless).")
+    provider: Literal["mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"] = Field(..., description="'mp' = Materials Project (API key); 'cod' = Crystallography Open Database; 'oqmd', 'nomad', 'jarvis', 'alexandria' = OPTIMADE providers (all keyless). Served by sea-eco (pip install 'pyslice[sea]').")
     formula: Optional[str] = Field(default=None, description="Chemical formula, e.g. 'SiO2' or 'BaTiO3'.")
     elements: Optional[List[str]] = Field(default=None, description="Element symbols that must all be present, e.g. ['Ga', 'N'].")
     limit: int = Field(default=10, ge=1, le=100, description="Maximum entries to return.")
@@ -186,7 +186,7 @@ class FetchStructureInput(StrictModel):
 
     Attributes
     ----------
-    provider : {"mp", "cod"}
+    provider : {"mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"}
         Database the entry comes from.
     entry_id : str
         Entry id from ``pyslice_search_structures`` (e.g. ``"mp-149"``).
@@ -202,7 +202,7 @@ class FetchStructureInput(StrictModel):
         Output format for the response.
     """
 
-    provider: Literal["mp", "cod"] = Field(..., description="'mp' or 'cod'.")
+    provider: Literal["mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"] = Field(..., description="Database the entry comes from, as in pyslice_search_structures.")
     entry_id: str = Field(..., min_length=1, description="Entry id, e.g. 'mp-149' or '1010939'.")
     filename: Optional[str] = Field(default=None, description="Workspace-relative output filename for the CIF.")
     load: bool = Field(default=True, description="Also load the CIF into a Trajectory handle.")
@@ -994,7 +994,8 @@ class PySliceService:
                 "frames": "Every trajectory frame is propagated; frame count = frozen-phonon configs or MD snapshots.",
                 "handles": "Handles are live in-memory objects; they do not survive a server restart — export .sea files to persist.",
                 "blocking": "pyslice_run_multislice and pyslice_run_md block until finished; check the estimated memory/grid in setup output first.",
-                "mp_api_key": "Materials Project needs a free API key (PYSLICE_MP_API_KEY or MP_API_KEY env var); COD is keyless.",
+                "mp_api_key": "Materials Project needs a free API key (MP_API_KEY / PYSLICE_MP_API_KEY env var, or sea-eco's credential store); COD and the OPTIMADE providers are keyless.",
+                "databases": "Structure retrieval goes through sea-eco's database importers and needs pip install 'pyslice[sea]'.",
             },
             "examples": {
                 "fetch": {"tool": "pyslice_fetch_structure", "params": {"provider": "cod", "entry_id": "1010939", "load": True}},
@@ -1066,11 +1067,11 @@ class PySliceService:
         limit: int,
         api_key: Optional[str],
     ) -> Dict[str, Any]:
-        """Search Materials Project or COD for structures.
+        """Search a structure database (through sea-eco) for structures.
 
         Parameters
         ----------
-        provider : {"mp", "cod"}
+        provider : {"mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"}
             Database to query.
         formula : str | None
             Chemical formula filter.
@@ -1112,7 +1113,7 @@ class PySliceService:
 
         Parameters
         ----------
-        provider : {"mp", "cod"}
+        provider : {"mp", "cod", "oqmd", "nomad", "jarvis", "alexandria"}
             Database the entry comes from.
         entry_id : str
             Entry id from :meth:`search_structures`.
@@ -1136,7 +1137,7 @@ class PySliceService:
         pyslice.io.databases.DatabaseError
             If the entry cannot be retrieved.
         """
-        from ..io.databases import fetch_cif
+        from ..io.databases import database_title, fetch_cif
         from ..io.loader import Loader
 
         target_dir = self.workspace / "structures"
@@ -1146,7 +1147,7 @@ class PySliceService:
             trajectory = Loader(filename=str(cif_path), timestep=timestep_ps).load()
             payload.update(self._register(trajectory, preferred=cif_path.stem))
             self._source_info[payload["handle"]] = {
-                "database": "Materials Project" if provider == "mp" else "Crystallography Open Database",
+                "database": database_title(provider),
                 "provider": provider,
                 "entry_id": entry_id,
                 "cif_path": str(cif_path),

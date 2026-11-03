@@ -54,8 +54,8 @@ profile:
 
 - `Metadata.Material` — kind (`Material`/`Sample`), formula, element counts,
   atom and frame counts, timestep.
-- `Metadata.Database` — provider, entry id, CIF path, for structures fetched
-  from Materials Project or COD.
+- `Metadata.Database` — database title, provider, entry id, CIF path, for
+  structures fetched from a database (through sea-eco).
 - `Metadata.build` — the `build_slab`/transform record. **Operations are
   JSON-encoded strings**, because sea-eco's `Metadata` silently drops
   lists-of-dicts on HDF5 write.

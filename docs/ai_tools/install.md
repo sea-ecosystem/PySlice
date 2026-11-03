@@ -56,7 +56,7 @@ intended first call in any zero-context session.
 | `multislice-imaging` | HAADF/ADF/BF, diffraction, CBED, 4D-STEM |
 | `tacaw-phonons` | Vibrational EELS, dispersions, spectrum images |
 | `md-setup` | ML-potential molecular dynamics |
-| `structure-retrieval` | Materials Project / COD → CIF → Trajectory |
+| `structure-retrieval` | MP / COD / OPTIMADE (via sea-eco) → CIF → Trajectory |
 
 ## Subagents
 
@@ -77,7 +77,7 @@ intended first call in any zero-context session.
 | Variable | Effect |
 |---|---|
 | `PYSLICE_MCP_WORKSPACE` | Default artifact workspace |
-| `PYSLICE_MP_API_KEY` / `MP_API_KEY` | Materials Project key (COD needs none) |
+| `MP_API_KEY` / `PYSLICE_MP_API_KEY` | Materials Project key, read by sea-eco (COD and OPTIMADE need none) |
 | `PYSLICE_DEVICE` | Force a compute device |
 | `PYSLICE_PRECISION` | `single` or `double` arithmetic (default `double`, MPS always `single`) |
 | `PYSLICE_BACKEND=numpy` | Force the numpy backend |

@@ -10,14 +10,17 @@ For the architecture and its boundaries, see
 ## Scope and authority
 
 The server drives simulations on the machine it runs on. It reads and writes
-files in its workspace, fetches from two public structure databases, and runs
+files in its workspace, fetches from public structure databases through
+sea-eco's importers, and runs
 compute that can occupy a GPU for a long time. It does not authenticate
 callers, so give it a workspace you are content for a client to write into.
 
 - **Reads:** structure files you name, plus workspace artifacts.
 - **Writes:** only inside the workspace; `_workspace_path` rejects escapes.
-- **Network:** Materials Project (needs your key) and COD (keyless), on
-  explicit search/fetch calls only.
+- **Network:** Materials Project (needs your key), COD and the OPTIMADE
+  providers OQMD, NOMAD, JARVIS and Alexandria (keyless), on explicit
+  search/fetch calls only; sea-eco makes the requests and caches entries in
+  its own cache directory.
 - **Compute:** `pyslice_run_multislice` and `pyslice_run_md` block and cannot
   be cancelled. Check the estimate from `pyslice_setup_multislice` first.
 
@@ -30,7 +33,7 @@ callers, so give it a workspace you are content for a client to write into.
 | Path traversal | All artifact paths workspace-relative and validated |
 | Silent parameter typos | Pydantic inputs use `extra="forbid"` |
 | Lost work | Handles are in-memory only; export `.sea` to persist |
-| Leaked API key | Pass via `PYSLICE_MP_API_KEY`, not in tool arguments |
+| Leaked API key | Pass via `MP_API_KEY` / `PYSLICE_MP_API_KEY` or sea-eco's credential store, not in tool arguments |
 
 ## The tools
 
@@ -87,7 +90,7 @@ pyslice_export_sea_file     + sample_handle, material_handle     → .sea with p
 | `Unknown handle` | `pyslice_list_handles`; handles do not survive a restart |
 | Wrong handle type | The error names actual vs expected — re-read the workflow order |
 | Estimate too large | Coarsen `sampling_A`, crop with `max_kx`/`max_ky`, or set `return_layers=null` for HAADF-only |
-| `requires sea-eco` | `pip install -e ".[sea]"` |
+| `requires sea-eco` (also for database search/fetch) | `pip install -e ".[sea]"` |
 | MD unavailable | `pip install -e ".[md]"` (Python 3.12) |
 | Database unreachable | The error names the host; COD needs no key, MP does |
 | A run failed midway | Caches under `psi_data/` make a rerun cheaper; pass `force_rerun` to bypass them |
